@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  username     String   @unique 
+  password  String  
+  role      UserRole @default(GARCOM)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders    Order[]
+}
+
+enum UserRole {
+  MANAGER 
+  CAIXA
+  GARCOM
+}
+
+model Product {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  description    String?
+  sellingPrice   Decimal  @db.Decimal(10, 2)
+  unitOfMeasure  String   // "L" (Liter), "UN" (Unit), etc.
+  minStockLevel  Float    @default(0) // For alerts (RF009)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  orderItems     OrderItem[]
+  purchases      Purchase[]
+  stockEntries   Stock[]
+}
+
+model Stock {
+  id              String    @id @default(cuid())
+  quantityCurrent Float
+  batch           String?
+  expiryDate      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  productId String  @unique
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  cnpj      String?
+  contact   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchases Purchase[]
+}
+
+model Purchase {
+  id           String   @id @default(cuid())
+  quantity     Float
+  costPrice    Decimal  @db.Decimal(10, 2)
+  purchaseDate DateTime @default(now())
+
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id])
+  supplierId   String
+  supplier     Supplier @relation(fields: [supplierId], references: [id])
+}
+
+
+model Order {
+  id        String      @id @default(cuid())
+  table     String
+  status    OrderStatus @default(OPEN)
+  total     Decimal     @default(0) @db.Decimal(10, 2)
+  tip       Decimal     @default(0) @db.Decimal(10, 2)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  closedAt  DateTime?
+
+  waiterId  String
+  waiter    User        @relation(fields: [waiterId], references: [id])
+  items     OrderItem[]
+  payments  Payment[]
+}
+
+enum OrderStatus {
+  OPEN
+  CLOSED
+  PAID
+}
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  quantity   Float
+  unitPrice  Decimal  @db.Decimal(10, 2)
+  isCourtesy Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  amount        Decimal       @db.Decimal(10, 2)
+  paymentMethod PaymentMethod
+  createdAt     DateTime      @default(now())
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+}
+
+enum PaymentMethod {
+  CASH
+  DEBIT
+  CREDIT
+  PIX
+}
+
+model Cashier {
+  id            String    @id @default(cuid())
+  openingDate   DateTime  @default(now())
+  closingDate   DateTime?
+  initialAmount Decimal   @db.Decimal(10, 2)
+  finalAmount   Decimal?  @db.Decimal(10, 2)
+  detailsJson   Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
