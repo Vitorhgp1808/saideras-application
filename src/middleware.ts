@@ -33,7 +33,7 @@ export async function middleware(request: NextRequest) {
         headers: requestHeaders,
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ message: 'Token inválido' }, { status: 401 });
   }
 }

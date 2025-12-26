@@ -3,55 +3,71 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
   id        String   @id @default(cuid())
   name      String
-  username     String   @unique 
-  password  String  
-  role      UserRole @default(GARCOM)
+  username  String   @unique
+  password  String
+  role      UserRole @default(WAITER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orders    Order[]
+  orders          Order[] // Pedidos feitos pelo garçom
+  cashierSessions Cashier[] // Turnos de caixa abertos por este usuário
+
+  @@index([role])
 }
 
 enum UserRole {
-  MANAGER 
-  CAIXA
-  GARCOM
+  ADMIN
+  CASHIER
+  WAITER
 }
+
+// ==========================================
+// PRODUTOS E ESTOQUE (Simplificado)
+// ==========================================
 
 model Product {
-  id             String   @id @default(cuid())
-  name           String   @unique
-  description    String?
-  sellingPrice   Decimal  @db.Decimal(10, 2)
-  unitOfMeasure  String   // "L" (Liter), "UN" (Unit), etc.
-  minStockLevel  Float    @default(0) // For alerts (RF009)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String          @id @default(cuid())
+  name          String          @unique
+  description   String?
+  sellingPrice  Decimal         @db.Decimal(10, 2)
+  unitOfMeasure String // "L", "UN", "KG"
+  category      ProductCategory // Adicionado para filtros (Chopp, Food, etc)
 
-  orderItems     OrderItem[]
-  purchases      Purchase[]
-  stockEntries   Stock[]
+  // Controle de Estoque Simplificado (Movido de tabela separada)
+  stock         Float     @default(0)
+  minStockLevel Float     @default(0)
+  batch         String? // Lote atual/principal
+  expiryDate    DateTime? // Validade do lote atual
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orderItems OrderItem[]
+  purchases  Purchase[] // Histórico de entradas
+
+  imageUrl String? 
+
+  @@index([category])
 }
 
-model Stock {
-  id              String    @id @default(cuid())
-  quantityCurrent Float
-  batch           String?
-  expiryDate      DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  productId String  @unique
-  product   Product @relation(fields: [productId], references: [id])
+enum ProductCategory {
+  CHOPP
+  FOOD
+  DRINK
+  OTHER
 }
 
+// ==========================================
+// FORNECEDORES E COMPRAS
+// ==========================================
 
 model Supplier {
   id        String   @id @default(cuid())
@@ -69,34 +85,51 @@ model Purchase {
   quantity     Float
   costPrice    Decimal  @db.Decimal(10, 2)
   purchaseDate DateTime @default(now())
+  batch        String? // Opcional: Registrar qual lote entrou nesta compra
 
-  productId    String
-  product      Product  @relation(fields: [productId], references: [id])
-  supplierId   String
-  supplier     Supplier @relation(fields: [supplierId], references: [id])
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([supplierId])
 }
 
+// ==========================================
+// PEDIDOS E VENDAS
+// ==========================================
 
 model Order {
-  id        String      @id @default(cuid())
-  table     String
-  status    OrderStatus @default(OPEN)
-  total     Decimal     @default(0) @db.Decimal(10, 2)
-  tip       Decimal     @default(0) @db.Decimal(10, 2)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id      String      @id @default(cuid())
+  tableId Int // Mudado para Int conforme solicitado
+  status  OrderStatus @default(OPEN)
+
+  // Valores Financeiros do Pedido
+  subtotal Decimal @default(0) @db.Decimal(10, 2)
+  discount Decimal @default(0) @db.Decimal(10, 2)
+  tip      Decimal @default(0) @db.Decimal(10, 2)
+  total    Decimal @default(0) @db.Decimal(10, 2) // subtotal - discount + tip
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   closedAt  DateTime?
 
-  waiterId  String
-  waiter    User        @relation(fields: [waiterId], references: [id])
-  items     OrderItem[]
-  payments  Payment[]
+  waiterId String
+  waiter   User        @relation(fields: [waiterId], references: [id], onDelete: Cascade)
+  items    OrderItem[]
+  payments Payment[]
+
+  @@index([waiterId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 enum OrderStatus {
   OPEN
   CLOSED
   PAID
+  CANCELLED // Sugestão: bom ter status de cancelado
 }
 
 model OrderItem {
@@ -107,10 +140,17 @@ model OrderItem {
   createdAt  DateTime @default(now())
 
   orderId   String
-  order     Order    @relation(fields: [orderId], references: [id])
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId String
-  product   Product  @relation(fields: [productId], references: [id])
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([productId])
 }
+
+// ==========================================
+// FINANCEIRO E CAIXA
+// ==========================================
 
 model Payment {
   id            String        @id @default(cuid())
@@ -119,7 +159,14 @@ model Payment {
   createdAt     DateTime      @default(now())
 
   orderId String
-  order   Order  @relation(fields: [orderId], references: [id])
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Conexão crucial: Pagamento pertence a um turno de caixa específico
+  cashierId String
+  cashier   Cashier @relation(fields: [cashierId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([cashierId])
 }
 
 enum PaymentMethod {
@@ -130,12 +177,24 @@ enum PaymentMethod {
 }
 
 model Cashier {
-  id            String    @id @default(cuid())
-  openingDate   DateTime  @default(now())
-  closingDate   DateTime?
-  initialAmount Decimal   @db.Decimal(10, 2)
-  finalAmount   Decimal?  @db.Decimal(10, 2)
-  detailsJson   Json?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  openingDate DateTime  @default(now())
+  closingDate DateTime?
+
+  initialAmount Decimal  @db.Decimal(10, 2) // Fundo de troco
+  finalAmount   Decimal? @db.Decimal(10, 2) // Quanto tem na gaveta ao fechar
+
+  // Quem abriu este caixa?
+  openedById String
+  openedBy   User   @relation(fields: [openedById], references: [id], onDelete: Cascade)
+
+  // Relação inversa para saber todo o dinheiro que entrou neste turno
+  payments Payment[]
+
+  detailsJson Json? // Para logs de conferência ou erros de fechamento
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([openedById])
+  @@index([openingDate])
 }

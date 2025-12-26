@@ -1,193 +1,162 @@
-// app/(dashboard)/estoque/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-
-type Product = {
-  id: string;
-  name: string;
-  description?: string;
-  currentStock: number;
-  minStockLevel: number;
-  unitOfMeasure: 'litro' | 'unidade';
-  sellingPrice: number;
-  stockEntries: { 
-    quantityCurrent: number;
-  }[];
-};
-
+import { useState } from "react";
+import { Product } from "../../../types/pdv";
+import { ProductList } from "../../../components/inventory/ProductList";
+import { ProductModal } from "../../../components/inventory/ProductModal";
+import { Button } from "../../../components/ui/Button";
+import { Plus, Search } from "lucide-react";
+import useSWR, { mutate } from 'swr';
+import { fetcher } from '../../../lib/fetcher';
 
 export default function EstoquePage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: products = [], error, isLoading } = useSWR<Product[]>('/api/products', fetcher);
+  
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem("authToken");
-    if (!token) {
-      setError("Não autorizado. Faça login novamente.");
-      return null;
-    }
+    if (!token) return null;
     return {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${token}`
     };
   };
 
-  const fetchProducts = async () => {
-    setIsLoading(true);
+  const filteredProducts = products.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          p.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+
+    const matchesCategory = categoryFilter === 'all' || p.category === categoryFilter;
+    
+    return matchesSearch && matchesCategory;
+  });
+
+  const handleOpenNew = () => {
+    setEditingProduct(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (product: Product) => {
+    setEditingProduct(product);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir este produto?")) return;
+
     try {
       const headers = getAuthHeaders();
-      if (!headers) {
-        setIsLoading(false);
-        return;
-      }
+      if (!headers) return;
 
-      const res = await fetch('/api/products', { headers });
-      if (!res.ok) {
-        throw new Error("Falha ao carregar produtos do estoque.");
-      }
-      const data: Product[] = await res.json();
-      setProducts(data);
-      setError(null);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
+      const res = await fetch(`/api/products/${id}`, {
+        method: 'DELETE',
+        headers
+      });
+
+      if (!res.ok) throw new Error("Falha ao excluir produto");
+      
+      mutate('/api/products');
+    } catch (err) {
+      if (err instanceof Error) alert(err.message);
+      else alert("Erro desconhecido");
     }
   };
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
+  const handleSave = async (productData: Partial<Product>) => {
+    setIsSaving(true);
+    try {
+      const headers = getAuthHeaders();
+      if (!headers) return;
 
+      const method = editingProduct ? 'PUT' : 'POST';
+      const url = editingProduct ? `/api/products/${editingProduct.id}` : '/api/products';
+
+      const res = await fetch(url, {
+        method,
+        headers,
+        body: JSON.stringify(productData)
+      });
+
+      if (!res.ok) throw new Error("Falha ao salvar produto");
+
+      mutate('/api/products');
+      setIsModalOpen(false);
+    } catch (err) {
+      if (err instanceof Error) alert(err.message);
+      else alert("Erro desconhecido");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (isLoading) {
-    return <LoadingSpinner />;
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+      </div>
+    );
   }
 
   if (error) {
-    return <ErrorDisplay message={error} />;
+    return <ErrorDisplay message={error instanceof Error ? error.message : 'Erro ao carregar produtos'} />;
   }
 
   return (
-    <div className="p-6 md:p-8">
+    <div className="p-6 md:p-8 animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
-        <h1 className="text-3xl font-bold text-gray-800">
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
           Gestão de Estoque
         </h1>
-        <Link 
-          href="/estoque/novo" 
-          className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold 
-                     rounded-lg shadow-md hover:bg-blue-700 transition-colors
-                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+        <Button onClick={handleOpenNew} icon={<Plus size={18} />}>
+          Novo Produto
+        </Button>
+      </div>
+
+      <div className="flex gap-4 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={20} />
+          <input 
+            type="text" 
+            placeholder="Buscar produto..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+          />
+        </div>
+        
+        <select 
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-4 py-2 rounded-lg focus:outline-none focus:border-amber-500"
         >
-          + Cadastrar Novo Produto
-        </Link>
+          <option value="all">Todos os tipos</option>
+          <option value="CHOPP">Chopp</option>
+          <option value="FOOD">Comida</option>
+          <option value="DRINK">Bebida</option>
+          <option value="OTHER">Outros</option>
+        </select>
       </div>
 
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Produto
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Estoque Atual
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Nível Mínimo
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Unidade
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Preço de Venda
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Ações
-              </th>
-            </tr>
-          </thead>
+      <ProductList 
+        products={filteredProducts} 
+        onEdit={handleEdit} 
+        onDelete={handleDelete} 
+      />
 
-          <tbody className="bg-white divide-y divide-gray-200">
-            {products.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="text-center py-10 text-gray-500">
-                  Nenhum produto cadastrado.
-                </td>
-              </tr>
-            ) : (
-              products.map(product => {
-
-                const currentStock = product.stockEntries?.[0]?.quantityCurrent ?? 0;
-                
-                const isLowStock = currentStock <= product.minStockLevel;
-
-                return (
-                  <tr 
-                    key={product.id} 
-                    className={`transition-colors ${isLowStock ? 'bg-yellow-50' : 'bg-white'} hover:bg-gray-50`}
-                  >
-
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                      {product.description && (
-                        <div className="text-sm text-gray-500">{product.description}</div>
-                      )}
-                    </td>
-
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${
-                      isLowStock ? 'text-red-600 font-bold' : 'text-gray-700'
-                    }`}>
-                      {currentStock}
-                      {isLowStock && <span className="ml-2">(BAIXO!)</span>}
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {product.minStockLevel}
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 capitalize">
-                      {product.unitOfMeasure}
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      R$ {product.sellingPrice}
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <Link
-                        href={`/estoque/${product.id}`}
-                        className="px-3 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-md shadow-sm hover:bg-yellow-600 transition-colors"
-                      >
-                        Editar
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-
-
-function LoadingSpinner() {
-  return (
-    <div className="flex h-screen items-center justify-center bg-gray-50">
-      <div className="flex items-center space-x-2">
-        <div className="w-4 h-4 rounded-full animate-pulse bg-blue-600"></div>
-        <div className="w-4 h-4 rounded-full animate-pulse bg-blue-600 [animation-delay:0.2s]"></div>
-        <div className="w-4 h-4 rounded-full animate-pulse bg-blue-600 [animation-delay:0.4s]"></div>
-        <span className="ml-3 text-lg font-medium text-gray-700">Carregando estoque...</span>
-      </div>
+      <ProductModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleSave}
+        product={editingProduct}
+        isLoading={isSaving}
+      />
     </div>
   );
 }

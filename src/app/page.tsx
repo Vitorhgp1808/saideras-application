@@ -78,7 +78,11 @@ export default function HomePage() {
               />
             </Box>
 
-            <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
+            <Box
+              component="form"
+              onSubmit={handleSubmit}
+              sx={{ width: "100%" }}
+            >
               <Stack spacing={2}>
                 <TextField
                   required
@@ -104,7 +108,7 @@ export default function HomePage() {
                 />
 
                 {error && (
-                  <Alert severity="error" sx={{ width: '100%' }}>
+                  <Alert severity="error" sx={{ width: "100%" }}>
                     {error}
                   </Alert>
                 )}
@@ -169,7 +173,8 @@ export default function HomePage() {
               fontStyle: "italic",
               letterSpacing: "0.05em",
               textTransform: "uppercase",
-              textShadow: "0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08)",
+              textShadow:
+                "0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08)",
               transform: "translateY(1rem)",
             }}
           >

@@ -65,8 +65,12 @@ export default function EditarFornecedorPage() {
         setCnpj(data.cnpj || ""); // Garante que não seja null
         setContact(data.contact || ""); // Garante que não seja null
 
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("Erro desconhecido");
+        }
       } finally {
         setIsLoadingData(false);
       }
@@ -119,8 +123,12 @@ export default function EditarFornecedorPage() {
         router.refresh(); 
       }, 2000);
 
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Erro desconhecido");
+      }
     } finally {
       setIsSubmitting(false);
     }

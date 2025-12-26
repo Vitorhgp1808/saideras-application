@@ -13,7 +13,7 @@ export default function EditarUsuarioPage() {
 
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
-  const [role, setRole] = useState<UserRole>(UserRole.GARCOM);
+  const [role, setRole] = useState<UserRole>(UserRole.WAITER);
   const [password, setPassword] = useState(""); 
 
   const [isLoading, setIsLoading] = useState(true);
@@ -54,8 +54,12 @@ export default function EditarUsuarioPage() {
         setName(user.name);
         setUsername(user.username);
         setRole(user.role);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("Erro desconhecido");
+        }
       } finally {
         setIsLoading(false);
       }
@@ -80,7 +84,11 @@ export default function EditarUsuarioPage() {
       return;
     }
 
-    const body: any = { name, username, role };
+    const body: { name: string; username: string; role: UserRole; password?: string } = {
+      name,
+      username,
+      role,
+    };
     if (password.trim() !== "") {
       body.password = password;
     }
@@ -104,8 +112,12 @@ export default function EditarUsuarioPage() {
         router.refresh();
       }, 2000);
 
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Erro desconhecido");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -143,15 +155,23 @@ export default function EditarUsuarioPage() {
         router.refresh();
       }, 2000);
 
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Erro desconhecido");
+      }
       setIsSubmitting(false);
     }
   };
 
 
   if (isLoading) {
-    return <LoadingSpinner />;
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+      </div>
+    );
   }
 
   const inputClass = "w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors";
@@ -207,9 +227,9 @@ export default function EditarUsuarioPage() {
               Cargo / Nível de Acesso (RNF003)
             </label>
             <select id="role" value={role} onChange={(e) => setRole(e.target.value as UserRole)} className={inputClass}>
-              <option value={UserRole.GARCOM}>Garçom</option>
-              <option value={UserRole.CAIXA}>Caixa</option>
-              <option value={UserRole.MANAGER}>Gerente</option>
+              <option value={UserRole.WAITER}>Garçom</option>
+              <option value={UserRole.CASHIER}>Caixa</option>
+              <option value={UserRole.ADMIN}>Gerente</option>
             </select>
           </div>
 
@@ -249,20 +269,6 @@ export default function EditarUsuarioPage() {
           </div>
         </div>
       </form>
-    </div>
-  );
-}
-
-
-function LoadingSpinner() {
-  return (
-    <div className="flex h-screen items-center justify-center bg-gray-50">
-      <div className="flex items-center space-x-2">
-        <div className="w-4 h-4 rounded-full animate-pulse bg-blue-600"></div>
-        <div className="w-4 h-4 rounded-full animate-pulse bg-blue-600 [animation-delay:0.2s]"></div>
-        <div className="w-4 h-4 rounded-full animate-pulse bg-blue-600 [animation-delay:0.4s]"></div>
-        <span className="ml-3 text-lg font-medium text-gray-700">Carregando usuário...</span>
-      </div>
     </div>
   );
 }

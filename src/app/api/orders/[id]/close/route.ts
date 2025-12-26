@@ -1,20 +1,52 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "../../../../../lib/prisma";
-import { getAuth } from "<saidera>/app/api/api/authUtils";
+import { getAuth } from "../../../api/authUtils";
 
+/**
+ * @swagger
+ * paths:
+ *   /api/orders/{id}/close:
+ *     put:
+ *       summary: Fecha um pedido
+ *       tags:
+ *         - Orders
+ *       security:
+ *         - BearerAuth: []
+ *       parameters:
+ *         - in: path
+ *           name: id
+ *           schema:
+ *             type: string
+ *           required: true
+ *           description: ID do pedido
+ *       responses:
+ *         '200':
+ *           description: Pedido fechado com sucesso
+ *         '401':
+ *           description: Não autorizado
+ *         '403':
+ *           description: Acesso negado (apenas CASHIER ou ADMIN)
+ *         '404':
+ *           description: Pedido não encontrado
+ *         '409':
+ *           description: Pedido não pode ser fechado
+ *         '500':
+ *           description: Erro interno do servidor
+ */
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await getAuth(req);
   if (auth.error) return auth.error;
-  if (!auth.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!auth.user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (!["CAIXA", "MANAGER"].includes(auth.user.role)) {
+  if (!["CASHIER", "ADMIN"].includes(auth.user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const orderId = params.id;
+  const { id: orderId } = await params;
 
   try {
     const order = await prisma.order.findUnique({
@@ -22,12 +54,12 @@ export async function PUT(
     });
 
     if (!order) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    if (order.status !== 'OPEN') {
+    if (order.status !== "OPEN") {
       return NextResponse.json(
-        { error: 'Order cannot be closed' },
+        { error: "Order cannot be closed" },
         { status: 409 }
       );
     }
@@ -35,7 +67,7 @@ export async function PUT(
     const closedOrder = await prisma.order.update({
       where: { id: orderId },
       data: {
-        status: 'CLOSED',
+        status: "CLOSED",
         closedAt: new Date(),
       },
     });
@@ -43,6 +75,9 @@ export async function PUT(
     return NextResponse.json(closedOrder);
   } catch (error) {
     console.error(`Error closing order ${orderId}:`, error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }

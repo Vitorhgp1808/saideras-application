@@ -1,327 +1,415 @@
-// app/(dashboard)/relatorios/page.tsx
 "use client";
 
-import { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { 
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  PieChart, Pie, Cell, Legend
+} from 'recharts';
+import { TrendingUp, Users, DollarSign, CreditCard, Clock, Award, Filter } from 'lucide-react';
 
-type FaturamentoData = {
-  periodo: { inicio: string; fim: string };
-  totalVendasBruto: number;
-  totalCortesias: number;
-  totalGorjetas: number;
-  totalLiquido: number;
+type OrderItem = {
+  id: string;
+  name: string;
+  quantity: number;
+  price: number;
+  isCourtesy: boolean;
 };
 
-type PerformanceData = {
-  topProdutos: Array<{
-    id: string;
-    name: string;
-    totalVendido: number; 
-  }>;
+type Order = {
+  id: string;
+  tableId: number;
+  status: string;
+  openTime: string;
+  closeTime: string;
+  subtotal: number;
+  discount: number;
+  tip: number;
+  total: number;
+  paymentMethod: string;
+  items: OrderItem[];
 };
 
-type FluxoCaixaData = {
-  totalEntradas: number; 
-  totalSaidas: number; 
-  saldo: number;
-};
-
-type ReportData = {
-  faturamento?: FaturamentoData;
-  performance?: PerformanceData;
-  fluxoCaixa?: FluxoCaixaData;
-};
-
-type ReportType = 'faturamento' | 'performance' | 'fluxoCaixa';
-
+const COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6'];
 
 export default function RelatoriosPage() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date();
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(today.getDate() - 30);
 
-  const [activeReport, setActiveReport] = useState<ReportType>('faturamento');
-  const [startDate, setStartDate] = useState(today);
-  const [endDate, setEndDate] = useState(today);
+  const [dateStart, setDateStart] = useState(thirtyDaysAgo.toISOString().split('T')[0]);
+  const [dateEnd, setDateEnd] = useState(today.toISOString().split('T')[0]);
   
-  const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("authToken");
-    if (!token) {
-      setError("Não autorizado. Faça login novamente.");
-      return null;
-    }
-    return {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`
-    };
-  };
-
-  const handleGenerateReport = async () => {
+  const fetchReports = async () => {
     setIsLoading(true);
     setError(null);
-    setReportData(null);
-
-    const params = new URLSearchParams({ from: startDate, to: endDate });
-    const apiUrl = `/api/reports/${activeReport}?${params.toString()}`;
-
     try {
-      const headers = getAuthHeaders();
-      if (!headers) {
-         setIsLoading(false);
-         return;
-      }
+      const token = localStorage.getItem("authToken");
+      if (!token) throw new Error("Não autorizado");
+
+      const params = new URLSearchParams({ from: dateStart, to: dateEnd });
+      const res = await fetch(`/api/reports/detailed_orders?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!res.ok) throw new Error("Falha ao carregar dados");
       
-      const res = await fetch(apiUrl, { headers });
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || "Falha ao gerar relatório.");
-      }
-
       const data = await res.json();
-      setReportData({ [activeReport]: data });
-
-    } catch (err: any) {
-      setError(err.message);
+      setOrders(data);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Ocorreu um erro desconhecido");
+      }
     } finally {
       setIsLoading(false);
     }
   };
-  
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value);
-  };
 
+  useEffect(() => {
+    fetchReports();
+  }, [dateStart, dateEnd]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const renderReportContent = () => {
-    if (isLoading) return <InlineLoadingSpinner />;
-    if (error) return <InlineErrorDisplay message={error} />;
-    if (!reportData) {
-      return (
-        <p className="text-gray-500 text-center py-10">
-          Selecione um período e clique em "Gerar Relatório".
-        </p>
-      );
-    }
+  const filteredOrders = useMemo(() => {
+    const start = new Date(dateStart).getTime();
+    const end = new Date(dateEnd).getTime() + (24 * 60 * 60 * 1000) - 1;
+    
+    return orders.filter(o => {
+      const orderDate = new Date(o.openTime).getTime();
+      return orderDate >= start && orderDate <= end;
+    }).sort((a, b) => new Date(a.openTime).getTime() - new Date(b.openTime).getTime());
+  }, [orders, dateStart, dateEnd]);
 
-    switch (activeReport) {
-      case 'faturamento':
-        return <FaturamentoReport data={reportData.faturamento} formatCurrency={formatCurrency} />;
-      case 'performance':
-        return <PerformanceReport data={reportData.performance} formatCurrency={formatCurrency} />;
-      case 'fluxoCaixa':
-        return <FluxoCaixaReport data={reportData.fluxoCaixa} formatCurrency={formatCurrency} />;
-      default:
-        return null;
-    }
-  };
-  
-  const getTabClass = (report: ReportType) => {
-    const baseClass = "px-4 py-2.5 text-sm font-semibold rounded-md cursor-pointer transition-colors flex-1 text-center";
-    if (activeReport === report) {
-      return `${baseClass} bg-blue-600 text-white shadow-md`;
-    }
-    return `${baseClass} bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200`;
-  };
+  const kpis = useMemo(() => {
+    const totalRevenue = filteredOrders.reduce((acc, o) => acc + Number(o.total), 0);
+    const totalTips = filteredOrders.reduce((acc, o) => acc + Number(o.tip), 0);
+    const totalOrders = filteredOrders.length;
+    const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+    const totalDiscount = filteredOrders.reduce((acc, o) => acc + Number(o.discount), 0);
 
-  return (
-    <div className="p-6 md:p-8">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Relatórios e Análises</h1>
+    return { totalRevenue, totalTips, totalOrders, averageTicket, totalDiscount };
+  }, [filteredOrders]);
 
-      <div className="p-4 md:p-6 bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-        <div className="flex flex-col sm:flex-row flex-wrap gap-2 mb-4">
-          <button
-            className={getTabClass('faturamento')}
-            onClick={() => setActiveReport('faturamento')}
-          >
-            Faturamento
-          </button>
-          <button
-            className={getTabClass('performance')}
-            onClick={() => setActiveReport('performance')}
-          >
-            Performance
-          </button>
-          <button
-            className={getTabClass('fluxoCaixa')}
-            onClick={() => setActiveReport('fluxoCaixa')}
-          >
-            Fluxo de Caixa
-          </button>
-        </div>
+  const revenueData = useMemo(() => {
+    const dataMap = new Map<string, number>();
+    
+    filteredOrders.forEach(o => {
+      const dateKey = new Date(o.openTime).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      const current = dataMap.get(dateKey) || 0;
+      dataMap.set(dateKey, current + Number(o.total));
+    });
 
-        {/* Seletores de Data */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-5">
-          <div className="flex-1 min-w-[150px]">
-            <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">De:</label>
-            <input
-              type="date"
-              id="startDate"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full p-2.5 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-          <div className="flex-1 min-w-[150px]">
-            <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">Até:</label>
-            <input
-              type="date"
-              id="endDate"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full p-2.5 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-        </div>
+    return Array.from(dataMap.entries()).map(([name, value]) => ({ name, value }));
+  }, [filteredOrders]);
 
-        <button 
-          onClick={handleGenerateReport} 
-          className="w-full p-3 bg-green-600 text-white font-semibold rounded-lg shadow-md 
-                     hover:bg-green-700 disabled:bg-green-300 transition-colors
-                     flex items-center justify-center" 
-          disabled={isLoading}
-        >
-          {isLoading ? <SpinnerIcon /> : null}
-          {isLoading ? "Gerando..." : "Gerar Relatório"}
-        </button>
+  const hourlyData = useMemo(() => {
+    const hours = Array(24).fill(0);
+    filteredOrders.forEach(o => {
+      const hour = new Date(o.openTime).getHours();
+      hours[hour]++;
+    });
+    return hours.map((count, hour) => ({
+      name: `${hour}h`,
+      count
+    })).filter(h => h.count > 0);
+  }, [filteredOrders]);
+
+  const paymentData = useMemo(() => {
+    const map = new Map<string, number>();
+    filteredOrders.forEach(o => {
+      const method = o.paymentMethod || 'Outros';
+      const label = method === 'card_credit' ? 'Crédito' : 
+                    method === 'card_debit' ? 'Débito' : 
+                    method === 'cash' ? 'Dinheiro' : 
+                    method === 'pix' ? 'PIX' : 'Outros';
+      map.set(label, (map.get(label) || 0) + 1);
+    });
+    return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
+  }, [filteredOrders]);
+
+  const topProducts = useMemo(() => {
+    const productMap = new Map<string, { quantity: number; revenue: number }>();
+
+    filteredOrders.forEach(o => {
+      o.items.forEach(item => {
+        const current = productMap.get(item.name) || { quantity: 0, revenue: 0 };
+        productMap.set(item.name, {
+          quantity: current.quantity + item.quantity,
+          revenue: current.revenue + (item.price * item.quantity)
+        });
+      });
+    });
+
+    return Array.from(productMap.entries())
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+  }, [filteredOrders]);
+
+  const cardClass = "bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-colors duration-200";
+
+  if (isLoading && orders.length === 0) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
       </div>
-
- 
-      <div className="p-4 md:p-6 bg-white rounded-lg shadow-md border border-gray-200 min-h-[200px]">
-        {renderReportContent()}
-      </div>
-    </div>
-  );
-}
-
-
-type ReportProps = {
-  formatCurrency: (value: number) => string;
-};
-
-const FaturamentoReport = ({ data, formatCurrency }: { data?: FaturamentoData } & ReportProps) => {
-  if (!data) return <p className="text-gray-500">Nenhum dado de faturamento encontrado.</p>;
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard title="Vendas (Bruto)" value={formatCurrency(data.totalVendasBruto)} />
-      <StatCard title="Cortesias" value={formatCurrency(data.totalCortesias)} />
-      <StatCard title="Gorjetas" value={formatCurrency(data.totalGorjetas)} />
-      <StatCard 
-        title="Total Líquido (Vendas - Cortesias)" 
-        value={formatCurrency(data.totalLiquido)} 
-        className="bg-blue-600 text-white"
-        titleClassName="text-blue-100"
-      />
-    </div>
-  );
-};
-
-const PerformanceReport = ({ data, formatCurrency }: { data?: PerformanceData } & ReportProps) => {
-  if (!data || !data.topProdutos || data.topProdutos.length === 0) {
-    return <p className="text-gray-500">Nenhum dado de performance encontrado.</p>;
+    );
   }
+
+  if (error) {
+    return (
+      <div className="p-8 text-center text-red-500">
+        Erro ao carregar relatório: {error}
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <h3 className="text-xl font-semibold text-gray-800 mb-3">Ranking de Produtos</h3>
-      <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-200">
-        {data.topProdutos.map((produto, index) => (
-          <div key={produto.id} className="flex justify-between items-center p-3 hover:bg-gray-50">
-            <span className="text-sm font-medium text-gray-900">
-              <strong className="mr-2">{index + 1}.</strong> {produto.name}
-            </span>
-            <span className="text-sm font-semibold text-gray-700">
-              {formatCurrency(produto.totalVendido)}
-            </span>
+    <div className="space-y-6 animate-fade-in pb-10 p-6">
+      {/* Header & Filters */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Inteligência de Negócio</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Análise detalhada de performance histórica</p>
+        </div>
+        
+        <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+          <div className="px-3 py-1.5 flex items-center gap-2 border-r border-slate-200 dark:border-slate-700">
+            <Filter size={16} className="text-amber-500" />
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Período</span>
           </div>
-        ))}
+          <input 
+            type="date" 
+            value={dateStart}
+            onChange={(e) => setDateStart(e.target.value)}
+            className="bg-transparent text-sm text-slate-600 dark:text-slate-300 focus:outline-none px-2 py-1"
+          />
+          <span className="text-slate-400">-</span>
+          <input 
+            type="date" 
+            value={dateEnd}
+            onChange={(e) => setDateEnd(e.target.value)}
+            className="bg-transparent text-sm text-slate-600 dark:text-slate-300 focus:outline-none px-2 py-1"
+          />
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className={cardClass}>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Faturamento Total</p>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+                R$ {kpis.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </h3>
+            </div>
+            <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg">
+              <TrendingUp size={20} />
+            </div>
+          </div>
+          <div className="mt-4 text-xs text-slate-400">
+            Descontos aplicados: <span className="text-red-400">R$ {kpis.totalDiscount.toFixed(2)}</span>
+          </div>
+        </div>
+
+        <div className={cardClass}>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Ticket Médio</p>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+                R$ {kpis.averageTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </h3>
+            </div>
+            <div className="p-2 bg-blue-500/10 text-blue-500 rounded-lg">
+              <DollarSign size={20} />
+            </div>
+          </div>
+           <div className="mt-4 text-xs text-slate-400">
+            Média por cliente/mesa
+          </div>
+        </div>
+
+        <div className={cardClass}>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Comandas Fechadas</p>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+                {kpis.totalOrders}
+              </h3>
+            </div>
+            <div className="p-2 bg-amber-500/10 text-amber-500 rounded-lg">
+              <Users size={20} />
+            </div>
+          </div>
+           <div className="mt-4 text-xs text-slate-400">
+            No período selecionado
+          </div>
+        </div>
+
+         <div className={cardClass}>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Gorjetas (10%)</p>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+                R$ {kpis.totalTips.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </h3>
+            </div>
+            <div className="p-2 bg-purple-500/10 text-purple-500 rounded-lg">
+              <Award size={20} />
+            </div>
+          </div>
+           <div className="mt-4 text-xs text-slate-400">
+            Repasse para equipe
+          </div>
+        </div>
+      </div>
+
+      {/* Main Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Revenue Evolution */}
+        <div className={`${cardClass} lg:col-span-2`}>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-6 flex items-center gap-2">
+            <TrendingUp size={18} className="text-amber-500"/>
+            Evolução do Faturamento
+          </h3>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={revenueData}>
+                <defs>
+                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                <XAxis dataKey="name" stroke="#94a3b8" tickLine={false} axisLine={false} tick={{fontSize: 12}} />
+                <YAxis stroke="#94a3b8" tickLine={false} axisLine={false} tickFormatter={(value) => `R$${value}`} tick={{fontSize: 12}} />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#1e293b', 
+                    borderColor: '#334155', 
+                    color: '#f1f5f9' 
+                  }}
+                  itemStyle={{ color: '#f59e0b' }}
+                  formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Faturamento']}
+                />
+                <Area type="monotone" dataKey="value" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Payment Methods */}
+        <div className={cardClass}>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-6 flex items-center gap-2">
+            <CreditCard size={18} className="text-blue-500"/>
+            Meios de Pagamento
+          </h3>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={paymentData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {paymentData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#1e293b', 
+                    borderColor: '#334155', 
+                    color: '#f1f5f9' 
+                  }}
+                />
+                <Legend verticalAlign="bottom" height={36} iconType="circle" />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Secondary Analysis Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* Peak Hours */}
+        <div className={cardClass}>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-6 flex items-center gap-2">
+            <Clock size={18} className="text-purple-500"/>
+            Horários de Pico (Abertura de Mesa)
+          </h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={hourlyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                <XAxis dataKey="name" stroke="#94a3b8" tickLine={false} axisLine={false} />
+                <YAxis stroke="#94a3b8" tickLine={false} axisLine={false} />
+                <Tooltip 
+                  cursor={{fill: '#334155', opacity: 0.4}}
+                  contentStyle={{ 
+                    backgroundColor: '#1e293b', 
+                    borderColor: '#334155', 
+                    color: '#f1f5f9' 
+                  }}
+                />
+                <Bar dataKey="count" name="Pedidos" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Top Products Table */}
+        <div className={cardClass}>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-6 flex items-center gap-2">
+            <Award size={18} className="text-emerald-500"/>
+            Top 5 Produtos (Receita Gerada)
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="border-b border-slate-200 dark:border-slate-700">
+                <tr>
+                  <th className="py-2 text-slate-500 dark:text-slate-400 font-normal text-sm">Produto</th>
+                  <th className="py-2 text-slate-500 dark:text-slate-400 font-normal text-sm text-right">Qtd.</th>
+                  <th className="py-2 text-slate-500 dark:text-slate-400 font-normal text-sm text-right">Receita</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
+                {topProducts.length > 0 ? (
+                  topProducts.map((product, index) => (
+                    <tr key={index} className="group">
+                      <td className="py-3 text-slate-700 dark:text-slate-200 text-sm font-medium flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-700 text-xs flex items-center justify-center text-slate-500">{index + 1}</span>
+                        {product.name}
+                      </td>
+                      <td className="py-3 text-right text-slate-600 dark:text-slate-400 text-sm">{product.quantity}</td>
+                      <td className="py-3 text-right text-emerald-600 dark:text-emerald-400 text-sm font-bold">
+                        R$ {product.revenue.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={3} className="py-8 text-center text-slate-500 text-sm">Sem dados para o período.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </div>
   );
 };
-
-const FluxoCaixaReport = ({ data, formatCurrency }: { data?: FluxoCaixaData } & ReportProps) => {
-  if (!data) return <p className="text-gray-500">Nenhum dado de fluxo de caixa encontrado.</p>;
-  
-  const saldoClass = data.saldo >= 0 
-    ? "bg-gray-800 text-white" 
-    : "bg-red-800 text-white";
-  
-  const saldoTitleClass = data.saldo >= 0 ? "text-gray-300" : "text-red-200";
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <StatCard 
-        title="Total Entradas (Vendas)" 
-        value={formatCurrency(data.totalEntradas)}
-        className="bg-green-50 border-green-200"
-        titleClassName="text-green-700"
-        valueClassName="text-green-900"
-      />
-      <StatCard 
-        title="Total Saídas (Compras)" 
-        value={formatCurrency(data.totalSaidas)}
-        className="bg-red-50 border-red-200"
-        titleClassName="text-red-700"
-        valueClassName="text-red-900"
-      />
-      <StatCard 
-        title="Saldo do Período" 
-        value={formatCurrency(data.saldo)}
-        className={saldoClass}
-        titleClassName={saldoTitleClass}
-      />
-    </div>
-  );
-};
-
-
-const StatCard = ({ title, value, className = "", titleClassName = "", valueClassName = "" }: 
-  { title: string; value: string; className?: string; titleClassName?: string; valueClassName?: string }) => (
-  <div className={`flex flex-col p-4 bg-gray-50 rounded-lg border border-gray-200 shadow-sm ${className}`}>
-    <span className={`text-sm font-medium text-gray-600 mb-1 ${titleClassName}`}>
-      {title}
-    </span>
-    <span className={`text-2xl font-bold text-gray-900 ${valueClassName}`}>
-      {value}
-    </span>
-  </div>
-);
-
-function SpinnerIcon() {
-  return (
-    <svg 
-      className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" 
-      xmlns="http://www.w3.org/2000/svg" 
-      fill="none" 
-      viewBox="0 0 24 24"
-    >
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-    </svg>
-  );
-}
-
-function InlineLoadingSpinner() {
-  return (
-    <div className="flex justify-center items-center py-10">
-      <div className="flex items-center space-x-2">
-        <div className="w-3 h-3 rounded-full animate-pulse bg-blue-600"></div>
-        <div className="w-3 h-3 rounded-full animate-pulse bg-blue-600 [animation-delay:0.2s]"></div>
-        <div className="w-3 h-3 rounded-full animate-pulse bg-blue-600 [animation-delay:0.4s]"></div>
-        <span className="ml-2 text-sm font-medium text-gray-700">Gerando relatório...</span>
-      </div>
-    </div>
-  );
-}
-
-function InlineErrorDisplay({ message }: { message: string }) {
-  return (
-    <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-lg" role="alert">
-      <strong className="font-bold">Erro: </strong>
-      <span className="block sm:inline">{message}</span>
-    </div>
-  );
-}

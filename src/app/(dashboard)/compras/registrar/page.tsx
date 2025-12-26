@@ -67,8 +67,12 @@ export default function RegistrarCompraPage() {
         setProducts(await productsRes.json());
         setSuppliers(await suppliersRes.json());
         
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) { // Alterado para unknown
+        if (err instanceof Error) { // Verificação de tipo
+          setError(err.message);
+        } else {
+          setError("Ocorreu um erro desconhecido ao carregar dados.");
+        }
       } finally {
         setIsLoading(false);
       }
@@ -124,12 +128,16 @@ export default function RegistrarCompraPage() {
       setValidade("");
 
       setTimeout(() => {
-        router.push('/compras'); 
+        router.push('/compras');
         router.refresh();
       }, 2000);
 
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) { // Alterado para unknown
+      if (err instanceof Error) { // Verificação de tipo
+        setError(err.message);
+      } else {
+        setError("Ocorreu um erro desconhecido ao registrar a compra.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -137,7 +145,11 @@ export default function RegistrarCompraPage() {
   
 
   if (isLoading) {
-    return <LoadingSpinner />;
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+      </div>
+    );
   }
 
   const inputClass = `w-full p-3 border border-gray-300 rounded-lg shadow-sm 
@@ -301,20 +313,6 @@ export default function RegistrarCompraPage() {
           </button>
         </div>
       </form>
-    </div>
-  );
-}
-
-
-function LoadingSpinner() {
-  return (
-    <div className="flex h-screen items-center justify-center bg-gray-50">
-      <div className="flex items-center space-x-2">
-        <div className="w-4 h-4 rounded-full animate-pulse bg-blue-600"></div>
-        <div className="w-4 h-4 rounded-full animate-pulse bg-blue-600 [animation-delay:0.2s]"></div>
-        <div className="w-4 h-4 rounded-full animate-pulse bg-blue-600 [animation-delay:0.4s]"></div>
-        <span className="ml-3 text-lg font-medium text-gray-700">Carregando dados...</span>
-      </div>
     </div>
   );
 }

@@ -20,7 +20,7 @@ async function getAuthManager(request: NextRequest) {
       process.env.JWT_SECRET as string
     ) as JwtPayload;
     
-    if (decoded.role !== UserRole.MANAGER) {
+    if (decoded.role !== UserRole.ADMIN) {
       throw new Error("Acesso não autorizado. Apenas Gerentes.");
     }
     return decoded;
@@ -30,6 +30,23 @@ async function getAuthManager(request: NextRequest) {
 }
 
 
+/**
+ * @swagger
+ * /api/users:
+ *   get:
+ *     summary: Lista todos os usuários
+ *     tags:
+ *       - Users
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Lista de usuários
+ *       '401':
+ *         description: Não autorizado
+ *       '500':
+ *         description: Erro interno do servidor
+ */
 export async function GET(request: NextRequest) {
   try {
     await getAuthManager(request);
@@ -47,8 +64,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(users);
 
-  } catch (error: any) {
-    if (error.message.includes("autorizado") || error.message.includes("Token")) {
+  } catch (error: unknown) {
+    if (error instanceof Error && (error.message.includes("autorizado") || error.message.includes("Token"))) {
       return NextResponse.json({ message: error.message }, { status: 401 });
     }
     console.error("Erro ao buscar usuários:", error);
@@ -57,6 +74,48 @@ export async function GET(request: NextRequest) {
 }
 
 
+/**
+ * @swagger
+ * /api/users:
+ *   post:
+ *     summary: Cria um novo usuário
+ *     tags:
+ *       - Users
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               username:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *                 enum: [ADMIN, CASHIER, WAITER]
+ *             required:
+ *               - name
+ *               - username
+ *               - password
+ *               - role
+ *     responses:
+ *       '201':
+ *         description: Usuário criado com sucesso
+ *       '400':
+ *         description: Dados de entrada inválidos
+ *       '401':
+ *         description: Não autorizado
+ *       '409':
+ *         description: Username já está em uso
+ *       '500':
+ *         description: Erro interno do servidor
+ */
 export async function POST(request: NextRequest) {
   try {
     await getAuthManager(request);
@@ -96,8 +155,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(newUser, { status: 201 });
 
-  } catch (error: any) {
-    if (error.message.includes("autorizado") || error.message.includes("Token")) {
+  } catch (error: unknown) {
+    if (error instanceof Error && (error.message.includes("autorizado") || error.message.includes("Token"))) {
       return NextResponse.json({ message: error.message }, { status: 401 });
     }
     console.error("Erro ao criar usuário:", error);

@@ -66,8 +66,12 @@ export default function EditarProdutoPage() {
         setUnitOfMeasure(data.unitOfMeasure);
         setMinStockLevel(String(data.minStockLevel));
 
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("Ocorreu um erro desconhecido.");
+        }
       } finally {
         setIsLoadingData(false);
       }
@@ -120,15 +124,18 @@ export default function EditarProdutoPage() {
         router.refresh(); 
       }, 2000);
 
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Ocorreu um erro desconhecido.");
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const inputClass = "w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors";
-  const selectClass = `${inputClass} bg-white appearance-none`;
 
   if (isLoadingData) {
     return (

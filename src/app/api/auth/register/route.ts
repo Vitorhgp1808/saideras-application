@@ -2,6 +2,40 @@ import { NextResponse } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
 import bcrypt from 'bcryptjs';
 
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Registra um novo usuário
+ *     tags:
+ *       - Auth
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               username:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *             required:
+ *               - name
+ *               - username
+ *               - password
+ *     responses:
+ *       '201':
+ *         description: Usuário criado com sucesso
+ *       '400':
+ *         description: "Nome, username e senha são obrigatórios"
+ *       '409':
+ *         description: Este username já está em uso
+ *       '500':
+ *         description: Erro interno do servidor
+ */
 export async function POST(request: Request) {
   try {
     const body = await request.json();

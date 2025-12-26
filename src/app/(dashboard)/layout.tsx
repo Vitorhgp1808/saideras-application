@@ -1,54 +1,21 @@
-// app/dashboard/layout.tsx
 "use client";
 
 import { useState } from "react";
-import Sidebar from "<saidera>/components/Sidebar";
-import Navbar from "<saidera>/components/Navbar";
-
-const layoutStyles = {
-  appContainer: {
-    display: 'flex',
-    flexDirection: 'column' as 'column', 
-    height: '100vh',
-    width: '100vw',
-    overflow: 'hidden',
-  },
-
-  mainArea: {
-    display: 'flex',
-    flex: 1,
-    overflow: 'hidden', 
-  },
-  pageContent: {
-    flex: 1, 
-    overflowY: 'auto' as 'auto',
-    padding: '20px',
-    backgroundColor: '#f7fafc',
-  }
-};
+import Sidebar from "../../components/Sidebar";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
-
-  const toggleSidebar = () => {
-    setIsSidebarOpen(prev => !prev);
-  };
+  const [isSidebarOpen] = useState(true);
 
   return (
-    <div style={layoutStyles.appContainer}>
-      
-
-      <Navbar onToggleSidebar={toggleSidebar} />
-      
-      <div style={layoutStyles.mainArea}>
-        
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
+      <div className="flex flex-1 overflow-hidden">
         <Sidebar isOpen={isSidebarOpen} />
         
-        <main style={layoutStyles.pageContent}>
+        <main className="flex-1 overflow-y-auto p-5 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
           {children}
         </main>
       </div>

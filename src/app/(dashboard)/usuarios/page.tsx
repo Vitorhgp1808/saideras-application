@@ -1,170 +1,213 @@
-// app/(dashboard)/usuarios/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import { UserRole } from "@prisma/client";
-
-type User = {
-  id: string;
-  name: string;
-  username: string;
-  role: UserRole;
-  createdAt: string;
-};
+import React, { useState, useEffect } from "react";
+import { Plus, Pencil, Trash2, ShieldAlert, Shield, User as UserIcon } from "lucide-react";
+import { User, UserRole } from "../../../types/users";
+import { Button } from "../../../components/ui/Button";
+import { UserModal } from "../../../components/users/UserModal";
+import { jwtDecode } from "jwt-decode";
+import useSWR, { mutate } from 'swr';
+import { fetcher } from '../../../lib/fetcher';
 
 const roleNames: Record<UserRole, string> = {
-  MANAGER: "Gerente",
-  CAIXA: "Caixa",
-  GARCOM: "Garçom",
+  ADMIN: "Gerente",
+  CASHIER: "Caixa",
+  WAITER: "Garçom",
 };
-
-const roleStyles: Record<UserRole, string> = {
-  MANAGER: "bg-red-100 text-red-800 border border-red-300",
-  CAIXA: "bg-blue-100 text-blue-800 border border-blue-300",
-  GARCOM: "bg-green-100 text-green-800 border border-green-300",
-};
-
 
 export default function UsuariosPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, error, isLoading } = useSWR<User[]>('/api/users', fetcher);
+  const users = data || [];
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("authToken");
-    if (!token) {
-      setError("Não autorizado. Faça login novamente.");
-      return null;
-    }
-    return {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`
-    };
-  };
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      setIsLoading(true);
+    const token = localStorage.getItem("authToken");
+    if (token) {
       try {
-        const headers = getAuthHeaders();
-        if (!headers) {
-          setIsLoading(false);
-          return;
-        }
-
-        const res = await fetch('/api/users', { headers });
-        if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.message || "Falha ao carregar usuários.");
-        }
-        const data: User[] = await res.json();
-        setUsers(data);
-        setError(null);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchUsers();
+        const decoded = jwtDecode<{ id: string }>(token);
+        setCurrentUserId(decoded.id);
+      } catch (e) { console.error(e); }
+    }
   }, []);
 
+  const handleOpenNew = () => {
+    setEditingUser(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (user: User) => {
+    setEditingUser(user);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir este usuário?")) return;
+
+    try {
+      const token = localStorage.getItem("authToken");
+      if (!token) return;
+
+      const res = await fetch(`/api/users/${id}`, {
+        method: 'DELETE',
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      
+      if (!res.ok) throw new Error("Falha ao excluir usuário");
+      
+      mutate('/api/users');
+    } catch (err) {
+      if (err instanceof Error) {
+        alert(err.message);
+      } else {
+        alert("Ocorreu um erro desconhecido.");
+      }
+    }
+  };
+
+  const handleSave = async (userData: Partial<User>) => {
+    setIsSaving(true);
+    try {
+      const token = localStorage.getItem("authToken");
+      if (!token) return;
+
+      const headers = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      };
+
+      const method = editingUser ? 'PUT' : 'POST';
+      const url = editingUser ? `/api/users/${editingUser.id}` : '/api/auth/register';
+
+      const res = await fetch(url, {
+        method,
+        headers,
+        body: JSON.stringify(userData)
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Falha ao salvar usuário");
+      }
+
+      mutate('/api/users');
+      setIsModalOpen(false);
+    } catch (err) {
+      if (err instanceof Error) {
+        alert(err.message);
+      } else {
+        alert("Ocorreu um erro desconhecido.");
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (isLoading) {
-    return <LoadingSpinner />;
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+      </div>
+    );
   }
 
   if (error) {
-    return <ErrorDisplay message={error} />;
+    return (
+      <div className="p-8 text-center text-red-500">
+        Erro ao carregar dados: {error instanceof Error ? error.message : 'Erro desconhecido'}
+      </div>
+    );
   }
 
   return (
-    <div className="p-6 md:p-8">
-      <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
-        <h1 className="text-3xl font-bold text-gray-800">
-          Gerenciamento de Usuários
-        </h1>
-        <Link 
-          href="/usuarios/novo" 
-          className="px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold 
-                     rounded-lg shadow-md hover:bg-blue-700 transition-colors
-                     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50
-                     w-full md:w-auto text-center"
-        >
-          + Novo Usuário
-        </Link>
+    <div className="p-6 md:p-8 animate-fade-in space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Gestão de Usuários</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Controle de acesso e permissões do sistema</p>
+        </div>
+        <Button onClick={handleOpenNew} icon={<Plus size={18} />}>
+          Novo Usuário
+        </Button>
       </div>
 
-      {users.length === 0 ? (
-        <div className="text-center py-10 text-gray-500 bg-white rounded-lg shadow-sm border">
-          Nenhum usuário cadastrado.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {users.map(user => (
-            <div 
-              key={user.id} 
-              className="relative flex flex-col bg-white shadow-md rounded-lg border 
-                         border-gray-200 overflow-hidden transition-all hover:shadow-lg"
-            >
-              
-              <span 
-                className={`absolute top-3 right-3 px-2.5 py-0.5 rounded-full 
-                            text-xs font-semibold ${roleStyles[user.role]}`}
-              >
-                {roleNames[user.role]}
-              </span>
-
-              <div className="p-4 flex-grow">
-                <h3 className="text-lg font-semibold text-gray-900 mb-1 mt-6">
-                  {user.name}
-                </h3>
-                <p className="text-sm text-gray-600 truncate" title={user.username}>
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm transition-colors duration-200">
+        <table className="w-full text-left">
+          <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 text-sm font-medium uppercase border-b border-slate-200 dark:border-slate-700">
+            <tr>
+              <th className="px-6 py-4">Usuário</th>
+              <th className="px-6 py-4">Login</th>
+              <th className="px-6 py-4">Função</th>
+              <th className="px-6 py-4 text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+            {users.map((user) => (
+              <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300">
+                      <UserIcon size={16} />
+                    </div>
+                    <span className="font-medium text-slate-900 dark:text-slate-200">{user.name}</span>
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-slate-500 dark:text-slate-400 font-mono text-sm">
                   {user.username}
-                </p>
-              </div>
-              
-              <div className="mt-auto bg-gray-50 px-4 py-3 border-t border-gray-200">
-                <Link 
-                  href={`/usuarios/${user.id}`}
-                  className="px-3 py-1 bg-yellow-500 text-white text-xs 
-                             font-semibold rounded-md shadow-sm hover:bg-yellow-600 
-                             transition-colors no-underline"
-                >
-                  Editar
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-
-
-function LoadingSpinner() {
-  return (
-    <div className="flex h-screen items-center justify-center bg-gray-50">
-      <div className="flex items-center space-x-2">
-        <div className="w-4 h-4 rounded-full animate-pulse bg-blue-600"></div>
-        <div className="w-4 h-4 rounded-full animate-pulse bg-blue-600 [animation-delay:0.2s]"></div>
-        <div className="w-4 h-4 rounded-full animate-pulse bg-blue-600 [animation-delay:0.4s]"></div>
-        <span className="ml-3 text-lg font-medium text-gray-700">Carregando usuários...</span>
+                </td>
+                <td className="px-6 py-4">
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase
+                    ${user.role === 'ADMIN' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400' : 
+                      user.role === 'CASHIER' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 
+                      'bg-blue-500/10 text-blue-600 dark:text-blue-400'}
+                  `}>
+                    {user.role === 'ADMIN' && <ShieldAlert size={12} />}
+                    {user.role === 'CASHIER' && <Shield size={12} />}
+                    {roleNames[user.role]}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <div className="flex justify-end items-center gap-2">
+                    <button 
+                      onClick={() => handleEdit(user)}
+                      className="p-2 text-slate-400 dark:text-slate-500 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded transition-colors"
+                      title="Editar Usuário"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    {user.id !== currentUserId ? (
+                      <button 
+                        onClick={() => handleDelete(user.id)}
+                        className="p-2 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-400/10 rounded transition-colors"
+                        title="Excluir Usuário"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    ) : (
+                      <span className="text-xs text-slate-400 dark:text-slate-500 italic px-2">Atual</span>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-    </div>
-  );
-}
 
-function ErrorDisplay({ message }: { message: string }) {
-  return (
-    <div className="flex h-screen items-center justify-center p-4">
-      <div className="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg shadow-md" role="alert">
-        <strong className="font-bold">Erro: </strong>
-        <span className="block sm:inline">{message}</span>
-      </div>
+      <UserModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleSave}
+        user={editingUser}
+        isLoading={isSaving}
+      />
     </div>
   );
 }

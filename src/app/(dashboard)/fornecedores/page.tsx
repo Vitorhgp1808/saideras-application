@@ -1,66 +1,26 @@
 // app/(dashboard)/fornecedores/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
+import useSWR from 'swr';
+import { fetcher } from '../../../lib/fetcher';
 
-type Supplier = {
-  id: string;
-  name: string;
-  cnpj?: string;
-  contact?: string;
-};
+// Reusing the Supplier type from purchases.ts
+import { Supplier } from '../../../types/purchases';
 
 export default function FornecedoresPage() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("authToken");
-    if (!token) {
-      setError("Não autorizado. Faça login novamente.");
-      return null;
-    }
-    return {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`
-    };
-  };
-
-  useEffect(() => {
-    const fetchSuppliers = async () => {
-      setIsLoading(true);
-      try {
-        const headers = getAuthHeaders();
-        if (!headers) {
-          setIsLoading(false);
-          return;
-        }
-
-        const res = await fetch('/api/suppliers', { headers });
-        if (!res.ok) {
-          throw new Error("Falha ao carregar fornecedores.");
-        }
-        const data: Supplier[] = await res.json();
-        setSuppliers(data);
-        setError(null);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchSuppliers();
-  }, []);
-
-
+  const { data: suppliers = [], error, isLoading } = useSWR<Supplier[]>('/api/suppliers', fetcher);
+  
   if (isLoading) {
-    return <LoadingSpinner />;
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+      </div>
+    );
   }
 
   if (error) {
-    return <ErrorDisplay message={error} />;
+    return <ErrorDisplay message={error instanceof Error ? error.message : 'Erro desconhecido'} />;
   }
 
   return (
@@ -125,20 +85,6 @@ export default function FornecedoresPage() {
   );
 }
 
-
-
-function LoadingSpinner() {
-  return (
-    <div className="flex h-screen items-center justify-center bg-gray-50">
-      <div className="flex items-center space-x-2">
-        <div className="w-4 h-4 rounded-full animate-pulse bg-blue-600"></div>
-        <div className="w-4 h-4 rounded-full animate-pulse bg-blue-600 [animation-delay:0.2s]"></div>
-        <div className="w-4 h-4 rounded-full animate-pulse bg-blue-600 [animation-delay:0.4s]"></div>
-        <span className="ml-3 text-lg font-medium text-gray-700">Carregando fornecedores...</span>
-      </div>
-    </div>
-  );
-}
 
 function ErrorDisplay({ message }: { message: string }) {
   return (

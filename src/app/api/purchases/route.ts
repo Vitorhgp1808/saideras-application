@@ -10,10 +10,49 @@ const purchaseSchema = z.object({
   costPrice: z.number().positive(),
 });
 
+/**
+ * @swagger
+ * /api/purchases:
+ *   post:
+ *     summary: Registra uma nova compra
+ *     tags:
+ *       - Purchases
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               productId:
+ *                 type: string
+ *               supplierId:
+ *                 type: string
+ *               quantity:
+ *                 type: number
+ *               costPrice:
+ *                 type: number
+ *             required:
+ *               - productId
+ *               - supplierId
+ *               - quantity
+ *               - costPrice
+ *     responses:
+ *       '201':
+ *         description: Compra registrada com sucesso
+ *       '400':
+ *         description: Dados de entrada inválidos
+ *       '403':
+ *         description: Acesso negado
+ *       '500':
+ *         description: Erro ao registrar compra
+ */
 export async function POST(request: NextRequest) {
   const userRole = request.headers.get('X-User-Role');
 
-  if (userRole !== 'MANAGER') {
+  if (userRole !== 'ADMIN') {
     return NextResponse.json({ message: 'Acesso negado. Somente gerentes podem registrar compras.' }, { status: 403 });
   }
 
@@ -33,35 +72,18 @@ export async function POST(request: NextRequest) {
           productId,
           supplierId,
           quantity,
-          costPrice,
+          costPrice: new Prisma.Decimal(costPrice),
         },
       });
 
-      const existingStock = await tx.stock.findUnique({
-        where: {
-          productId: productId,
+      await tx.product.update({
+        where: { id: productId },
+        data: {
+          stock: {
+            increment: quantity,
+          },
         },
       });
-
-      if (existingStock) {
-        await tx.stock.update({
-          where: {
-            id: existingStock.id,
-          },
-          data: {
-            quantityCurrent: {
-              increment: quantity,
-            },
-          },
-        });
-      } else {
-        await tx.stock.create({
-          data: {
-            productId: productId,
-            quantityCurrent: quantity,
-          },
-        });
-      }
 
       return newPurchase;
     });
@@ -81,10 +103,50 @@ export async function POST(request: NextRequest) {
   }
 }
 
+/**
+ * @swagger
+ * /api/purchases:
+ *   get:
+ *     summary: Lista as compras com filtros
+ *     tags:
+ *       - Purchases
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: productId
+ *         schema:
+ *           type: string
+ *         description: Filtra as compras por ID do produto
+ *       - in: query
+ *         name: supplierId
+ *         schema:
+ *           type: string
+ *         description: Filtra as compras por ID do fornecedor
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Data de início do filtro (YYYY-MM-DD)
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Data de fim do filtro (YYYY-MM-DD)
+ *     responses:
+ *       '200':
+ *         description: Lista de compras
+ *       '403':
+ *         description: Acesso negado
+ *       '500':
+ *         description: Erro ao buscar compras
+ */
 export async function GET(request: NextRequest) {
     const userRole = request.headers.get('X-User-Role');
 
-    if (userRole !== 'MANAGER') {
+    if (userRole !== 'ADMIN') {
         return NextResponse.json({ message: 'Acesso negado. Somente gerentes podem visualizar as compras.' }, { status: 403 });
     }
 
