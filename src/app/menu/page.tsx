@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import MenuBoard from '@/src/components/menu/MenuBoard';
+import MenuBoard from '@/components/menu/MenuBoard';
 const prisma = new PrismaClient();
 
 export const dynamic = 'force-dynamic';

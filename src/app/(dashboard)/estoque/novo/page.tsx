@@ -5,7 +5,7 @@ import { useState, ChangeEvent } from "react"; // Adicionado ChangeEvent
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image"; // NOVO: Para mostrar o preview
-import { supabase } from "@/src/lib/supabase";
+import { supabase } from "@/lib/supabase";
 export default function NovoProdutoPage() {
   const router = useRouter();
   

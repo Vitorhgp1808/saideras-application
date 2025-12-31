@@ -1,3 +1,98 @@
+/**
+ * @swagger
+ * /api/orders/{id}/close:
+ *   post:
+ *     summary: Fecha um pedido e realiza baixa de estoque inteligente
+ *     tags:
+ *       - Orders
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID do pedido
+ *     responses:
+ *       '200':
+ *         description: Pedido fechado e estoque baixado
+ *       '400':
+ *         description: Pedido já fechado/cancelado
+ *       '404':
+ *         description: Pedido não encontrado
+ *       '500':
+ *         description: Erro interno do servidor
+ */
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  // Só executa se rota for /close
+  if (!req.url.endsWith('/close')) return;
+  const auth = await getAuth(req);
+  if (auth.error) return auth.error;
+  if (!auth.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+  try {
+    // Busca pedido com itens e modificadores
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        items: {
+          include: {
+            product: true,
+            orderItemModifiers: {
+              include: {
+                modifierItem: {
+                  include: { product: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!order) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+    if (order.status !== 'OPEN') {
+      return NextResponse.json({ error: 'Pedido já fechado ou cancelado.' }, { status: 400 });
+    }
+    // Baixa de estoque dos ingredientes das marmitas
+    for (const item of order.items) {
+      // Verifica se é marmita (produto composto)
+      const recipes = await prisma.productRecipe.findMany({
+        where: { productId: item.productId },
+      });
+      for (const recipe of recipes) {
+        // Soma quantidade total a ser baixada
+        const totalQty = recipe.quantity * item.quantity;
+        await prisma.product.update({
+          where: { id: recipe.ingredientId },
+          data: { stock: { decrement: totalQty } },
+        });
+      }
+      // Para cada modificador que seja produto, baixa estoque
+      for (const mod of item.orderItemModifiers) {
+        if (mod.modifierItem.product) {
+          await prisma.product.update({
+            where: { id: mod.modifierItem.product.id },
+            data: { stock: { decrement: item.quantity } },
+          });
+        }
+      }
+    }
+    // Atualiza status do pedido para CLOSED
+    await prisma.order.update({
+      where: { id },
+      data: { status: 'CLOSED', closedAt: new Date() },
+    });
+    return NextResponse.json({ message: 'Pedido fechado e estoque baixado.' });
+  } catch (error) {
+    console.error(`Error closing order ${id}:`, error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
 import { NextResponse, type NextRequest } from 'next/server';
 import { prisma } from "./../../../../lib/prisma";
 import { getAuth } from "../../api/authUtils";
@@ -50,10 +145,23 @@ export async function DELETE(
   const { id } = await params;
 
   try {
-    // Verifica se a ordem existe e se está aberta (só pode cancelar aberta?)
+    // Busca pedido com itens e modificadores
     const order = await prisma.order.findUnique({
       where: { id },
-      include: { items: true }
+      include: {
+        items: {
+          include: {
+            product: true,
+            orderItemModifiers: {
+              include: {
+                modifierItem: {
+                  include: { product: true },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!order) {
@@ -64,17 +172,43 @@ export async function DELETE(
       return NextResponse.json({ error: 'Apenas comandas abertas podem ser canceladas.' }, { status: 400 });
     }
 
-    // Excluir itens primeiro (cascade deve cuidar, mas explicitamente é bom)
+    // Reverte baixa de estoque dos ingredientes das marmitas
+    for (const item of order.items) {
+      // Verifica se é marmita (produto composto)
+      const recipes = await prisma.productRecipe.findMany({
+        where: { productId: item.productId },
+      });
+      for (const recipe of recipes) {
+        // Soma quantidade total a ser revertida
+        const totalQty = recipe.quantity * item.quantity;
+        await prisma.product.update({
+          where: { id: recipe.ingredientId },
+          data: { stock: { increment: totalQty } },
+        });
+      }
+      // Para cada modificador que seja produto, reverte estoque
+      for (const mod of item.orderItemModifiers) {
+        if (mod.modifierItem.product) {
+          await prisma.product.update({
+            where: { id: mod.modifierItem.product.id },
+            data: { stock: { increment: item.quantity } },
+          });
+        }
+      }
+    }
+
+    // Excluir itens/modificadores
+    await prisma.orderItemModifier.deleteMany({
+      where: { orderItemId: { in: order.items.map(i => i.id) } }
+    });
     await prisma.orderItem.deleteMany({
       where: { orderId: id }
     });
-
-    // Excluir a ordem
     await prisma.order.delete({
       where: { id }
     });
 
-    return NextResponse.json({ message: 'Order cancelled successfully' });
+    return NextResponse.json({ message: 'Order cancelled successfully, estoque revertido.' });
   } catch (error) {
     console.error(`Error deleting order ${id}:`, error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
@@ -125,6 +259,16 @@ export async function GET(
         items: {
           include: {
             product: true,
+            orderItemModifiers: {
+              include: {
+                modifierItem: {
+                  include: {
+                    modifierGroup: true,
+                    product: true,
+                  },
+                },
+              },
+            },
           },
         },
         waiter: true,
@@ -135,7 +279,19 @@ export async function GET(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    return NextResponse.json(order);
+    // Formata resposta detalhada para marmitas
+    const formattedOrder = {
+      ...order,
+      items: order.items.map(item => ({
+        ...item,
+        modifiers: item.orderItemModifiers?.map(mod => ({
+          group: mod.modifierItem.modifierGroup.name,
+          choice: mod.modifierItem.product?.name || mod.modifierItem.name
+        })) || []
+      }))
+    };
+
+    return NextResponse.json(formattedOrder);
   } catch (error) {
     console.error(`Error fetching order ${id}:`, error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

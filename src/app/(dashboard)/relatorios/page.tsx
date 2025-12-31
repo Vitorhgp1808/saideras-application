@@ -5,11 +5,12 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, Legend
 } from 'recharts';
-import { TrendingUp, Users, DollarSign, CreditCard, Clock, Award, Filter } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, CreditCard, Clock, Award, Filter, Utensils } from 'lucide-react';
 
 type OrderItem = {
   id: string;
   name: string;
+  category?: string; // Adicionado
   quantity: number;
   price: number;
   isCourtesy: boolean;
@@ -39,6 +40,9 @@ export default function RelatoriosPage() {
   const [dateStart, setDateStart] = useState(thirtyDaysAgo.toISOString().split('T')[0]);
   const [dateEnd, setDateEnd] = useState(today.toISOString().split('T')[0]);
   
+  // Novo Estado para o filtro de produto
+  const [productFilter, setProductFilter] = useState<'all' | 'marmita' | 'outros'>('all');
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,26 +76,66 @@ export default function RelatoriosPage() {
 
   useEffect(() => {
     fetchReports();
-  }, [dateStart, dateEnd]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [dateStart, dateEnd]); 
 
+  // Lógica principal de filtragem e recálculo
   const filteredOrders = useMemo(() => {
     const start = new Date(dateStart).getTime();
     const end = new Date(dateEnd).getTime() + (24 * 60 * 60 * 1000) - 1;
     
-    return orders.filter(o => {
+    // 1. Filtra por data
+    const dateFiltered = orders.filter(o => {
       const orderDate = new Date(o.openTime).getTime();
       return orderDate >= start && orderDate <= end;
-    }).sort((a, b) => new Date(a.openTime).getTime() - new Date(b.openTime).getTime());
-  }, [orders, dateStart, dateEnd]);
+    });
+
+    // 2. Filtra por Tipo de Produto e Recalcula Totais
+    // Se o usuário selecionar "Marmitas", a receita mostrada será APENAS das marmitas dentro das comandas
+    return dateFiltered.map(order => {
+      // Filtra os itens dentro da comanda
+      const validItems = order.items.filter(item => {
+        if (productFilter === 'all') return true;
+        
+        // Verifica se é marmita pelo nome ou categoria (ajuste a string conforme seu DB)
+        const isMarmita = 
+          item.name.toLowerCase().includes('marmita') || 
+          item.category?.toLowerCase().includes('marmita');
+
+        return productFilter === 'marmita' ? isMarmita : !isMarmita;
+      });
+
+      // Se não sobrou nenhum item e não estamos vendo "tudo", essa comanda não deve contar
+      if (validItems.length === 0) return null;
+
+      // Recalcula o total baseado apenas nos itens filtrados
+      const newSubtotal = validItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+      
+      // Proporção para ajustar desconto e gorjeta (opcional, aqui mantive simples recalculando o total bruto dos itens)
+      // Para análise de produto, geralmente queremos o Valor Bruto de Venda daquele produto
+      const newTotal = newSubtotal; 
+
+      return {
+        ...order,
+        items: validItems,
+        total: newTotal,
+        subtotal: newSubtotal,
+        tip: productFilter === 'all' ? order.tip : 0, // Zera gorjeta se filtrar produto para não distorcer análise
+        discount: productFilter === 'all' ? order.discount : 0 // Zera desconto se filtrar produto
+      };
+    })
+    .filter((o): o is Order => o !== null) // Remove comandas vazias após filtro
+    .sort((a, b) => new Date(a.openTime).getTime() - new Date(b.openTime).getTime());
+
+  }, [orders, dateStart, dateEnd, productFilter]);
 
   const kpis = useMemo(() => {
     const totalRevenue = filteredOrders.reduce((acc, o) => acc + Number(o.total), 0);
+    // Se estiver filtrando produto específico, gorjeta pode não fazer sentido, mas mantemos a soma se existir
     const totalTips = filteredOrders.reduce((acc, o) => acc + Number(o.tip), 0);
-    const totalOrders = filteredOrders.length;
+    const totalOrders = filteredOrders.length; // Quantidade de vendas contendo esse produto
     const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-    const totalDiscount = filteredOrders.reduce((acc, o) => acc + Number(o.discount), 0);
-
-    return { totalRevenue, totalTips, totalOrders, averageTicket, totalDiscount };
+    
+    return { totalRevenue, totalTips, totalOrders, averageTicket };
   }, [filteredOrders]);
 
   const revenueData = useMemo(() => {
@@ -126,9 +170,11 @@ export default function RelatoriosPage() {
                     method === 'card_debit' ? 'Débito' : 
                     method === 'cash' ? 'Dinheiro' : 
                     method === 'pix' ? 'PIX' : 'Outros';
-      map.set(label, (map.get(label) || 0) + 1);
+      // Aqui somamos o valor, não a quantidade de comandas, para ver representatividade financeira do produto no meio de pgto
+      map.set(label, (map.get(label) || 0) + o.total);
     });
-    return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
+    // Converter para formatar
+    return Array.from(map.entries()).map(([name, value]) => ({ name, value: Number(value.toFixed(2)) }));
   }, [filteredOrders]);
 
   const topProducts = useMemo(() => {
@@ -177,24 +223,65 @@ export default function RelatoriosPage() {
           <p className="text-slate-500 dark:text-slate-400 text-sm">Análise detalhada de performance histórica</p>
         </div>
         
-        <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
-          <div className="px-3 py-1.5 flex items-center gap-2 border-r border-slate-200 dark:border-slate-700">
-            <Filter size={16} className="text-amber-500" />
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Período</span>
-          </div>
-          <input 
-            type="date" 
-            value={dateStart}
-            onChange={(e) => setDateStart(e.target.value)}
-            className="bg-transparent text-sm text-slate-600 dark:text-slate-300 focus:outline-none px-2 py-1"
-          />
-          <span className="text-slate-400">-</span>
-          <input 
-            type="date" 
-            value={dateEnd}
-            onChange={(e) => setDateEnd(e.target.value)}
-            className="bg-transparent text-sm text-slate-600 dark:text-slate-300 focus:outline-none px-2 py-1"
-          />
+        <div className="flex flex-col lg:flex-row gap-3">
+            {/* Seletor de Tipo de Produto */}
+            <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg self-start lg:self-auto">
+                <button
+                    onClick={() => setProductFilter('all')}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                        productFilter === 'all' 
+                        ? 'bg-white dark:bg-slate-600 text-amber-600 shadow-sm' 
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
+                    }`}
+                >
+                    Tudo
+                </button>
+                <button
+                    onClick={() => setProductFilter('marmita')}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1 ${
+                        productFilter === 'marmita' 
+                        ? 'bg-white dark:bg-slate-600 text-amber-600 shadow-sm' 
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
+                    }`}
+                >
+                    <Utensils size={14} />
+                    Marmitas
+                </button>
+                <button
+                    onClick={() => setProductFilter('outros')}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-1 ${
+                        productFilter === 'outros' 
+                        ? 'bg-white dark:bg-slate-600 text-amber-600 shadow-sm' 
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'
+                    }`}
+                >
+                   <Utensils size={14} />
+                    Restaurante
+                </button>
+            </div>
+
+            {/* Seletor de Data */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-white dark:bg-slate-800 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm min-w-0">
+                <div className="px-3 py-1.5 flex items-center gap-2 border-b sm:border-b-0 sm:border-r border-slate-200 dark:border-slate-700 min-w-[110px]">
+                    <Filter size={16} className="text-amber-500" />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Período</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 flex-1">
+                    <input 
+                    type="date" 
+                    value={dateStart}
+                    onChange={(e) => setDateStart(e.target.value)}
+                    className="bg-transparent text-sm text-slate-600 dark:text-slate-300 focus:outline-none px-2 py-1 min-w-[120px]"
+                    />
+                    <span className="text-slate-400 hidden sm:inline">-</span>
+                    <input 
+                    type="date" 
+                    value={dateEnd}
+                    onChange={(e) => setDateEnd(e.target.value)}
+                    className="bg-transparent text-sm text-slate-600 dark:text-slate-300 focus:outline-none px-2 py-1 min-w-[120px]"
+                    />
+                </div>
+            </div>
         </div>
       </div>
 
@@ -203,7 +290,9 @@ export default function RelatoriosPage() {
         <div className={cardClass}>
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Faturamento Total</p>
+              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                  {productFilter === 'all' ? 'Faturamento Total' : `Vendas (${productFilter})`}
+              </p>
               <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
                 R$ {kpis.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </h3>
@@ -211,9 +300,6 @@ export default function RelatoriosPage() {
             <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg">
               <TrendingUp size={20} />
             </div>
-          </div>
-          <div className="mt-4 text-xs text-slate-400">
-            Descontos aplicados: <span className="text-red-400">R$ {kpis.totalDiscount.toFixed(2)}</span>
           </div>
         </div>
 
@@ -230,14 +316,14 @@ export default function RelatoriosPage() {
             </div>
           </div>
            <div className="mt-4 text-xs text-slate-400">
-            Média por cliente/mesa
+            Média por pedido {productFilter !== 'all' && 'filtrado'}
           </div>
         </div>
 
         <div className={cardClass}>
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Comandas Fechadas</p>
+              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Vendas Realizadas</p>
               <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
                 {kpis.totalOrders}
               </h3>
@@ -247,16 +333,21 @@ export default function RelatoriosPage() {
             </div>
           </div>
            <div className="mt-4 text-xs text-slate-400">
-            No período selecionado
+            Contendo {productFilter === 'all' ? 'itens' : productFilter}
           </div>
         </div>
 
          <div className={cardClass}>
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Gorjetas (10%)</p>
+              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                  {productFilter === 'all' ? 'Gorjetas (10%)' : 'Itens Vendidos'}
+              </p>
               <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
-                R$ {kpis.totalTips.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                {productFilter === 'all' 
+                    ? `R$ ${kpis.totalTips.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                    : filteredOrders.reduce((acc, o) => acc + o.items.reduce((sum, i) => sum + i.quantity, 0), 0)
+                }
               </h3>
             </div>
             <div className="p-2 bg-purple-500/10 text-purple-500 rounded-lg">
@@ -264,7 +355,7 @@ export default function RelatoriosPage() {
             </div>
           </div>
            <div className="mt-4 text-xs text-slate-400">
-            Repasse para equipe
+            {productFilter === 'all' ? 'Repasse para equipe' : 'Quantidade unitária'}
           </div>
         </div>
       </div>
@@ -276,7 +367,7 @@ export default function RelatoriosPage() {
         <div className={`${cardClass} lg:col-span-2`}>
           <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-6 flex items-center gap-2">
             <TrendingUp size={18} className="text-amber-500"/>
-            Evolução do Faturamento
+            Evolução do Faturamento {productFilter !== 'all' && `(${productFilter})`}
           </h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
@@ -309,7 +400,7 @@ export default function RelatoriosPage() {
         <div className={cardClass}>
           <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-6 flex items-center gap-2">
             <CreditCard size={18} className="text-blue-500"/>
-            Meios de Pagamento
+            Meios de Pagamento (Volume R$)
           </h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
@@ -333,6 +424,7 @@ export default function RelatoriosPage() {
                     borderColor: '#334155', 
                     color: '#f1f5f9' 
                   }}
+                  formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Total']}
                 />
                 <Legend verticalAlign="bottom" height={36} iconType="circle" />
               </PieChart>
@@ -348,7 +440,7 @@ export default function RelatoriosPage() {
         <div className={cardClass}>
           <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-6 flex items-center gap-2">
             <Clock size={18} className="text-purple-500"/>
-            Horários de Pico (Abertura de Mesa)
+            Horários de Pico (Vendas)
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -374,7 +466,7 @@ export default function RelatoriosPage() {
         <div className={cardClass}>
           <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-6 flex items-center gap-2">
             <Award size={18} className="text-emerald-500"/>
-            Top 5 Produtos (Receita Gerada)
+            Top 5 Produtos {productFilter !== 'all' ? `(${productFilter})` : ''}
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left">

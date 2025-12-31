@@ -53,7 +53,16 @@ model Product {
   orderItems OrderItem[]
   purchases  Purchase[] // Histórico de entradas
 
-  imageUrl String? 
+  isComposite Boolean  @default(false)
+  active      Boolean  @default(true)
+
+  imageUrl String?
+
+  modifierGroups ModifierGroup[] // Grupos de opções que este produto tem
+  modifierItems  ModifierItem[] // Se este produto for usado como "opção" dentro de um grupo
+
+  recipeParent     ProductRecipe[] @relation("RecipeParent") // Receita: Do que este produto é feito?
+  recipeIngredient ProductRecipe[] @relation("RecipeIngredient") // Receita: Onde este produto é usado como ingrediente?
 
   @@index([category])
 }
@@ -62,6 +71,7 @@ enum ProductCategory {
   CHOPP
   FOOD
   DRINK
+  PACKED_LUNCH
   OTHER
 }
 
@@ -102,8 +112,10 @@ model Purchase {
 
 model Order {
   id      String      @id @default(cuid())
-  tableId Int // Mudado para Int conforme solicitado
+  tableId Int? // Mudado para opcional
   status  OrderStatus @default(OPEN)
+
+  nomePedido String?
 
   // Valores Financeiros do Pedido
   subtotal Decimal @default(0) @db.Decimal(10, 2)
@@ -137,12 +149,17 @@ model OrderItem {
   quantity   Float
   unitPrice  Decimal  @db.Decimal(10, 2)
   isCourtesy Boolean  @default(false)
+  baixadoNaCozinha Boolean @default(false) // Controle de baixa na cozinha para marmitas
   createdAt  DateTime @default(now())
+
+  observacaoPedido String?
 
   orderId   String
   order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  modifiers OrderItemModifier[]
 
   @@index([orderId])
   @@index([productId])
@@ -198,3 +215,80 @@ model Cashier {
   @@index([openedById])
   @@index([openingDate])
 }
+
+// =============================
+// PRODUTOS COMPOSTOS E MODIFICADORES
+// =============================
+
+// =============================
+// NOVO: MODIFICADORES (Para Marmitas e Combos)
+// =============================
+
+model ModifierGroup {
+  id            String @id @default(cuid())
+  name          String // Ex: "Escolha sua Proteína", "Guarnições"
+  minSelections Int    @default(0)
+  maxSelections Int    @default(1)
+  order         Int    @default(0) // Para ordenação customizada
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  items ModifierItem[]
+}
+
+model ModifierItem {
+  id         String   @id @default(cuid())
+  name       String // Ex: "Bife Acebolado", "Arroz Branco"
+  priceExtra Decimal? @default(0) @db.Decimal(10, 2)
+  order      Int      @default(0) // Para ordenação customizada
+
+  modifierGroupId String
+  modifierGroup   ModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+
+  // Link opcional: Se este item abate estoque de um produto real
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+
+  // Relação inversa para os itens de pedido
+  orderItemModifiers OrderItemModifier[]
+}
+
+// =============================
+// DETALHAMENTO DO PEDIDO (ESCOLHAS)
+// =============================
+
+model OrderItemModifier {
+  id String @id @default(cuid())
+
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  modifierItemId String
+  modifierItem   ModifierItem @relation(fields: [modifierItemId], references: [id], onDelete: Cascade)
+
+  // SNAPSHOT (CRUCIAL): Salva os dados no momento da compra
+  nameSnapshot  String // Nome do item na hora da venda
+  priceSnapshot Decimal @default(0) @db.Decimal(10, 2) // Preço cobrado na hora
+}
+
+// =============================
+// FICHA TÉCNICA (RECEITA)
+// =============================
+
+model ProductRecipe {
+  id String @id @default(cuid())
+
+  // O produto final (ex: Marmita Padrão)
+  productId String
+  product   Product @relation("RecipeParent", fields: [productId], references: [id], onDelete: Cascade)
+
+  // O ingrediente consumido (ex: Embalagem de Isopor)
+  ingredientId String
+  ingredient   Product @relation("RecipeIngredient", fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  quantity Float // Quantidade a baixar (ex: 1 un, 0.200 kg)
+  unit     String? // Opcional, apenas para referência visual
+}
+
+// Adiciona relação reversa para OrderItemModifier

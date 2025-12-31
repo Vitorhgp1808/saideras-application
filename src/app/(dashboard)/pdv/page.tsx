@@ -36,6 +36,16 @@ export default function PdvPage() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
+    // Responsivo: painel lateral vira drawer/modal em telas pequenas
+  const [showOrderPanelMobile, setShowOrderPanelMobile] = useState(false);
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setShowOrderPanelMobile(!!selectedComanda || !!selectedTableNumber);
+    } else {
+      setShowOrderPanelMobile(false);
+    }
+  }, [selectedComanda, selectedTableNumber]);
+
   // Gera os slots combinando o array fixo com as ordens da API
   const slots: ComandaSlot[] = useMemo(() => {
     // Encontra o maior número de comanda existente na API
@@ -331,7 +341,8 @@ export default function PdvPage() {
           />
         </div>
 
-        <div className="w-96 h-full border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl z-20 flex flex-col">
+        {/* Painel lateral fixo só em telas md+ */}
+        <div className="hidden md:flex w-96 h-full border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl z-20 flex-col">
           <OrderPanel
             comanda={selectedComanda}
             selectedTableNumber={selectedTableNumber}
@@ -344,6 +355,35 @@ export default function PdvPage() {
             onOpenTable={handleOpenTable}
           />
         </div>
+
+        {/* Drawer/modal para mobile */}
+        {showOrderPanelMobile && (
+          <div className="fixed inset-0 z-40 flex md:hidden">
+            <div className="absolute inset-0 bg-black/40" onClick={() => { setSelectedComanda(null); setSelectedTableNumber(null); }} />
+            <div className="relative w-full max-w-md ml-auto h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl animate-slideInRight">
+              {/* Botão de fechar no topo direito */}
+              <button
+                className="absolute top-3 right-3 z-50 p-2 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 shadow"
+                aria-label="Fechar painel"
+                onClick={() => { setSelectedComanda(null); setSelectedTableNumber(null); }}
+                type="button"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+              <OrderPanel
+                comanda={selectedComanda}
+                selectedTableNumber={selectedTableNumber}
+                products={products}
+                onAddItem={handleAddItem}
+                onRemoveItem={handleRemoveItem}
+                onToggleCourtesy={handleToggleCourtesy}
+                onCloseAccount={handleCloseAccount}
+                onCancelOrder={handleCancelOrder}
+                onOpenTable={handleOpenTable}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {selectedComanda && (

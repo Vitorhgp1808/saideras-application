@@ -3,7 +3,7 @@ import Image from "next/image";
 export default function LoginPage() {
   return (
     <main
-      className="flex min-h-screen items-center justify-center p-6 bg-cover bg-center text-white"
+      className="relative flex min-h-screen items-center justify-center p-2 sm:p-6 bg-cover bg-center text-white"
       style={{
         backgroundImage: `
           linear-gradient(180deg, rgba(15,23,42,0.75), rgba(8,12,20,0.75)),
@@ -11,8 +11,8 @@ export default function LoginPage() {
         `,
       }}
     >
-      <div className="w-full max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-        <section className="px-6 py-8">
+      <div className="w-full max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10 items-center">
+        <section className="px-2 sm:px-6 py-6 sm:py-8">
           <div className="mb-6 flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-gray-600 flex items-center justify-center shadow-lg">
               <Image
@@ -33,17 +33,17 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-4">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold leading-tight mb-4 break-anywhere">
             Bem-vindo ao Sistema de gestão do Saídera — qualidade, controle e
             velocidade
           </h1>
 
-          <p className="text-zinc-300 text-lg mb-8 max-w-xl">
+          <p className="text-zinc-300 text-base sm:text-lg mb-8 max-w-xl">
             Simplifique a operação do bar: monitore estoque, acompanhe vendas em
             tempo real e mantenha o chopp sempre perfeito.
           </p>
 
-          <div className="flex flex-wrap gap-3 items-center">
+          <div className="flex flex-wrap gap-2 sm:gap-3 items-center">
             <Link
               href="/pdv"
               className="inline-flex items-center gap-3 bg-gradient-to-r from-amber-600 to-yellow-500 text-zinc-900 font-semibold px-6 py-3 rounded-lg shadow-lg transform hover:scale-[1.02] transition"
@@ -73,7 +73,7 @@ export default function LoginPage() {
             segurança.
           </p>
 
-          <ul className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <ul className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
             <li className="bg-white/6 backdrop-blur-sm rounded-lg p-3 text-sm">
               <strong className="block text-white">Controle de estoque</strong>
               <span className="text-zinc-300">Evite desperdício</span>
@@ -89,8 +89,8 @@ export default function LoginPage() {
           </ul>
         </section>
 
-        <aside className="px-6 py-8 flex items-center justify-center">
-          <div className="w-full max-w-md bg-gradient-to-b from-black/40 to-white/5 border border-white/6 rounded-2xl p-6 backdrop-blur-md shadow-2xl">
+        <aside className="px-2 sm:px-6 py-6 sm:py-8 flex items-center justify-center">
+          <div className="w-full max-w-md bg-gradient-to-b from-black/40 to-white/5 border border-white/6 rounded-2xl p-4 sm:p-6 backdrop-blur-md shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-sm text-zinc-300">Controle de vendas</p>
@@ -98,7 +98,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="h-40 rounded-lg overflow-hidden bg-gradient-to-tr from-yellow-500/20 to-transparent border border-white/4 flex items-center justify-center">
+            <div className="h-32 sm:h-40 rounded-lg overflow-hidden bg-gradient-to-tr from-yellow-500/20 to-transparent border border-white/4 flex items-center justify-center">
               <svg
                 width="120"
                 height="60"
@@ -133,7 +133,7 @@ export default function LoginPage() {
         </aside>
       </div>
 
-      <footer className="absolute bottom-6 left-0 right-0 flex justify-center text-xs text-zinc-400">
+      <footer className="w-full mt-8 sm:mt-0 absolute bottom-2 sm:bottom-6 left-0 right-0 flex justify-center text-xs text-zinc-400 px-2">
         <span>
           © {new Date().getFullYear()} Saídera — Desenvolvido para bares e
           eventos

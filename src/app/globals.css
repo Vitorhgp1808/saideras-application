@@ -1,3 +1,9 @@
+/* Utilitário para evitar overflow de texto */
+.break-anywhere {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
 @import "tailwindcss";
 
 /* Configuração para Dark Mode via classe 'dark' */
@@ -52,4 +58,56 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  min-width: 0;
+  min-height: 100vh;
+  box-sizing: border-box;
 }
+
+/* Utilitários para responsividade */
+.container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .container {
+    max-width: 640px;
+  }
+}
+@media (min-width: 768px) {
+  .container {
+    max-width: 768px;
+  }
+}
+@media (min-width: 1024px) {
+  .container {
+    max-width: 1024px;
+  }
+}
+@media (min-width: 1280px) {
+  .container {
+    max-width: 1280px;
+  }
+}
+@media (min-width: 1536px) {
+  .container {
+    max-width: 1536px;
+  }
+}
+
+/* Garante que imagens e elementos não "estourem" o layout */
+img, video, svg, canvas {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Quebra de palavras para textos longos */
+.break-words {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+

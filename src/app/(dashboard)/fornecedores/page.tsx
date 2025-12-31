@@ -24,7 +24,7 @@ export default function FornecedoresPage() {
   }
 
   return (
-    <div className="p-6 md:p-8">
+    <div className="p-3 sm:p-6 md:p-8">
       <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
         <h1 className="text-3xl font-bold text-gray-800">
           Fornecedores
@@ -45,15 +45,14 @@ export default function FornecedoresPage() {
           Nenhum fornecedor cadastrado.
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
           {suppliers.map(supplier => (
             <div 
               key={supplier.id} 
-              className="flex flex-col bg-white shadow-md rounded-lg border border-gray-200 
-                         overflow-hidden transition-all hover:shadow-lg"
+              className="flex flex-col bg-white shadow-md rounded-lg border border-gray-200 overflow-hidden transition-all hover:shadow-lg min-w-0"
             >
-              <div className="p-4 flex-grow">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <div className="p-4 grow">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2 break-anywhere">
                   {supplier.name}
                 </h3>
                 {supplier.cnpj && (
@@ -88,7 +87,7 @@ export default function FornecedoresPage() {
 
 function ErrorDisplay({ message }: { message: string }) {
   return (
-    <div className="flex h-screen items-center justify-center p-4">
+    <div className="flex h-screen items-center justify-center p-2 sm:p-4">
       <div className="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg shadow-md" role="alert">
         <strong className="font-bold">Erro: </strong>
         <span className="block sm:inline">{message}</span>

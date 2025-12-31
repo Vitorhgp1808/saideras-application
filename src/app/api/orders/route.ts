@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { table } = body;
+    const { table, items } = body;
 
     if (!table) {
       return NextResponse.json(
@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Cria o pedido
     const order = await prisma.order.create({
       data: {
         tableId: table,
@@ -67,7 +68,58 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json(order, { status: 201 });
+    // Se houver itens, adiciona ao pedido
+    if (items && Array.isArray(items)) {
+      for (const item of items) {
+        // item: { productId, quantity, unitPrice, isCourtesy, modifiers }
+        const orderItem = await prisma.orderItem.create({
+          data: {
+            orderId: order.id,
+            productId: item.productId,
+            quantity: item.quantity ?? 1,
+            unitPrice: item.unitPrice,
+            isCourtesy: item.isCourtesy ?? false,
+          },
+        });
+        // Se for marmita e tiver modificadores, salva escolhas
+        if (item.modifiers && Array.isArray(item.modifiers)) {
+          for (const mod of item.modifiers) {
+            // mod: { modifierItemId }
+            await prisma.orderItemModifier.create({
+              data: {
+                orderItemId: orderItem.id,
+                modifierItemId: mod.modifierItemId,
+              },
+            });
+          }
+        }
+      }
+    }
+
+    // Retorna pedido com itens e modificadores
+    const fullOrder = await prisma.order.findUnique({
+      where: { id: order.id },
+      include: {
+        items: {
+          include: {
+            product: true,
+            orderItemModifiers: {
+              include: {
+                modifierItem: {
+                  include: {
+                    modifierGroup: true,
+                    product: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        waiter: true,
+      },
+    });
+
+    return NextResponse.json(fullOrder, { status: 201 });
   } catch (error) {
     console.error("Error creating order:", error);
     return NextResponse.json(
@@ -118,9 +170,13 @@ export async function GET(req: NextRequest) {
   const dateParam = searchParams.get("date"); // YYYY-MM-DD
 
   try {
-    // Usando any para permitir flexibilidade na cláusula OR sem importar tipos complexos do Prisma
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const whereClause: any = {};
+    // Refatorado para tipagem segura
+    type OrderWhereClause = {
+      status?: { equals: OrderStatus };
+      createdAt?: { gte: Date; lte: Date };
+      OR?: Array<{ createdAt: { gte: Date; lte: Date } } | { status: "OPEN" }>;
+    };
+    const whereClause: OrderWhereClause = {};
 
     if (status) {
       whereClause.status = { equals: status as OrderStatus };

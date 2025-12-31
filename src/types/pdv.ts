@@ -2,6 +2,7 @@ export enum ProductCategory {
   CHOPP = "CHOPP",
   FOOD = "FOOD",
   DRINK = "DRINK",
+  PACKED_LUNCH = "PACKED_LUNCH",
   OTHER = "OTHER",
 }
 

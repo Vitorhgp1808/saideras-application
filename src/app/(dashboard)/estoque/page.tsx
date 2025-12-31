@@ -28,15 +28,14 @@ export default function EstoquePage() {
     };
   };
 
-  const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          p.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-
-    const matchesCategory = categoryFilter === 'all' || p.category === categoryFilter;
-    
-    return matchesSearch && matchesCategory;
-  });
+  const filteredProducts = products
+    .filter(p => !p.isComposite)
+    .filter(p => {
+      const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                            p.description?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = categoryFilter === 'all' || p.category === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
 
   const handleOpenNew = () => {
     setEditingProduct(null);
@@ -47,6 +46,41 @@ export default function EstoquePage() {
     setEditingProduct(product);
     setIsModalOpen(true);
   };
+
+  // --- NOVA FUNÇÃO: Atualiza o status Ativo/Inativo ---
+  const handleToggleActive = async (product: Product, active: boolean) => {
+    const headers = getAuthHeaders();
+    if (!headers) return;
+
+    // 1. Atualização Otimista (Muda na tela instantaneamente antes do servidor)
+    mutate('/api/products', (currentProducts: Product[] | undefined) => {
+        if (!currentProducts) return [];
+        return currentProducts.map(p => 
+            p.id === product.id ? { ...p, active } : p
+        );
+    }, false); // "false" impede o revalidation imediato para não piscar
+
+    try {
+        // 2. Envia para a API
+        // Nota: Assumi que sua API aceita PATCH. Se não aceitar, mude para PUT e envie o objeto todo.
+        const res = await fetch(`/api/products/${product.id}`, {
+            method: 'PATCH', 
+            headers,
+            body: JSON.stringify({ active })
+        });
+
+        if (!res.ok) throw new Error("Erro ao atualizar status");
+
+        // 3. Confirma os dados reais do servidor
+        mutate('/api/products');
+    } catch (error) {
+        console.error(error);
+        alert("Não foi possível atualizar o status.");
+        // Reverte a mudança visual em caso de erro
+        mutate('/api/products'); 
+    }
+  };
+  // ----------------------------------------------------
 
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este produto?")) return;
@@ -144,10 +178,12 @@ export default function EstoquePage() {
         </select>
       </div>
 
+      {/* CORREÇÃO AQUI: Passando a prop onToggleActive */}
       <ProductList 
         products={filteredProducts} 
         onEdit={handleEdit} 
         onDelete={handleDelete} 
+        onToggleActive={handleToggleActive}
       />
 
       <ProductModal 

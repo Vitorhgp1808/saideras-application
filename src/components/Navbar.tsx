@@ -82,16 +82,16 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
   };
 
   return (
-    <header className="w-full h-[60px] px-5 flex items-center justify-between bg-gray-800 border-b border-gray-700 box-border text-gray-200 flex-shrink-0">
+    <header className="w-full h-[60px] px-5 flex items-center justify-between bg-gray-800 border-b border-gray-700 box-border text-gray-200 shrink-0">
       <div className="flex items-center">
         <button
           onClick={onToggleSidebar}
           className="bg-transparent border-none cursor-pointer p-2.5 rounded-lg transition-colors duration-200 ease-in-out hover:bg-gray-700"
           aria-label="Toggle sidebar"
         >
-          <span className="block w-[22px] h-[2px] bg-gray-200 my-1 rounded-[1px]"></span>
-          <span className="block w-[22px] h-[2px] bg-gray-200 my-1 rounded-[1px]"></span>
-          <span className="block w-[22px] h-[2px] bg-gray-200 my-1 rounded-[1px]"></span>
+          <span className="block w-[22px] h-0.5 bg-gray-200 my-1 rounded-[1px]"></span>
+          <span className="block w-[22px] h-0.5 bg-gray-200 my-1 rounded-[1px]"></span>
+          <span className="block w-[22px] h-0.5 bg-gray-200 my-1 rounded-[1px]"></span>
         </button>
         <h1 className="text-[19px] font-semibold text-gray-200 ml-3 whitespace-nowrap">
           Gestão Choperia
@@ -106,7 +106,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
           aria-expanded={isDropdownOpen}
           aria-controls="profile-menu-id"
         >
-          <div className="w-9 h-9 rounded-full bg-gray-600 text-white text-[15px] font-semibold flex items-center justify-center overflow-hidden flex-shrink-0">
+          <div className="w-9 h-9 rounded-full bg-gray-600 text-white text-[15px] font-semibold flex items-center justify-center overflow-hidden shrink-0">
             {getInitials(userName)}
           </div>
           <div className="flex flex-col ml-3 text-left leading-tight">

@@ -1,13 +1,25 @@
-// components/Sidebar.tsx
 "use client";
 
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
-import useSWR from "swr"; // Import useSWR
+import { useEffect, useState, useCallback } from "react"; // Mantenha apenas esta linha
+import useSWR from "swr";
 import { jwtDecode } from "jwt-decode";
-import { Beer, LayoutDashboard, ShoppingCart, Truck, BarChart3, Users, LogOut, Sun, Moon } from "lucide-react";
+// Combinei seus ícones do lucide-react em um único import para ficar mais limpo
+import { 
+  LayoutDashboard,
+   LogOut, Sun, Moon, ChevronLeft, ChevronRight , Gauge,
+  ChefHat,
+  Utensils,
+  Boxes,
+  ShoppingCart,
+  BarChart3,
+  Users,
+  Beer,
+  Truck,
+  Receipt
+} from "lucide-react";
 import { useTheme } from "./ThemeProvider";
 import { fetcher } from "../lib/fetcher";
 import { CustomError } from "../types/error";
@@ -43,19 +55,29 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} />, roles: ['ADMIN'] },
-  { href: "/pdv", label: "PDV (Comandas)", icon: <Beer size={20} />, roles: ['WAITER', 'CASHIER', 'ADMIN'] },
-  { href: "/estoque", label: "Estoque", icon: <ShoppingCart size={20} />, roles: ['ADMIN'] },
-  { href: "/compras", label: "Compras", icon: <Truck size={20} />, roles: ['ADMIN'] },
+  { href: "/dashboard", label: "Dashboard", icon: <Gauge size={20} />, roles: ['ADMIN'] },
+  { href: "/pdv", label: "Comandas", icon: <Receipt size={20} />, roles: ['WAITER', 'CASHIER', 'ADMIN'] },
+  { href: "/cozinha/marmitas", label: "Cozinha", icon: <ChefHat size={20} />, roles: ['ADMIN', 'CASHIER', 'WAITER'] },
+  { href: "/marmitas", label: "Marmitas", icon: <Utensils size={20} />, roles: ['ADMIN', 'CASHIER', 'WAITER'] },
+  { href: "/estoque", label: "Estoque", icon: <Boxes size={20} />, roles: ['ADMIN'] },
+  { href: "/compras", label: "Compras", icon: <ShoppingCart size={20} />, roles: ['ADMIN'] },
   { href: "/relatorios", label: "Relatórios", icon: <BarChart3 size={20} />, roles: ['ADMIN'] },
   { href: "/usuarios", label: "Usuários", icon: <Users size={20} />, roles: ['ADMIN'] },
 ];
-
 type SidebarProps = {
   isOpen: boolean;
+  onToggle?: () => void;
 };
 
-export default function Sidebar({ isOpen }: SidebarProps) {
+export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
+  // Detecta se está em mobile
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   const router = useRouter();
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
@@ -173,9 +195,10 @@ export default function Sidebar({ isOpen }: SidebarProps) {
   }
 
   const sidebarClasses = `
-    h-full bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col box-border
+    fixed top-0 left-0 z-30 h-screen bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col box-border
     flex-shrink-0 whitespace-nowrap transition-all duration-300 ease-in-out
-    ${isOpen ? 'w-64' : 'w-0 overflow-hidden'}
+    ${isMobile ? 'w-16 items-center' : isOpen ? 'w-64' : 'w-16 items-center'}
+    shadow-lg
   `;
 
   const currentRole = userData?.role || (authToken ? (jwtDecode(authToken) as DecodedToken).role : null);
@@ -185,35 +208,58 @@ export default function Sidebar({ isOpen }: SidebarProps) {
 
   return (
     <aside className={sidebarClasses}>
-      <div className="p-6 flex items-center justify-center">
-        <div className="relative h-16 w-40">
-          <Image
-            src="/saidera-logo.png"
-            alt="Saidera Logo"
-            fill
-            className="object-contain dark:invert"
-            priority
-          />
+      {/* Botão de minimizar/expandir só aparece se não for mobile */}
+      {!isMobile && (
+        <button
+          onClick={onToggle}
+          className="absolute -right-3 top-6 z-20 w-6 h-6 flex items-center justify-center bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-full shadow transition hover:bg-slate-100 dark:hover:bg-slate-800"
+          aria-label={isOpen ? 'Minimizar sidebar' : 'Expandir sidebar'}
+          tabIndex={0}
+          type="button"
+        >
+          {isOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+        </button>
+      )}
+
+      <div className={`flex items-center justify-center ${isOpen && !isMobile ? 'p-6' : 'py-4 px-2'}`}>
+        {isMobile ? (
+          <div className="relative h-8 w-8">
+            <Image
+              src="/saidera-logo.png"
+              alt="Saidera Logo"
+              fill
+              className="object-contain dark:invert rounded-full"
+              priority
+            />
+          </div>
+        ) : (
+          <div className={`relative ${isOpen ? 'h-16 w-40' : 'h-10 w-10'}`}>
+            <Image
+              src="/saidera-logo.png"
+              alt="Saidera Logo"
+              fill
+              className={`object-contain dark:invert transition-all duration-300 ${isOpen ? '' : 'rounded-full'}`}
+              priority
+            />
+          </div>
+        )}
+      </div>
+
+      {!isMobile && isOpen && (
+        <div className="px-6 pb-6 mb-2 border-b border-slate-200 dark:border-slate-800">
+          <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Logado como</p>
+          <p className="font-medium text-slate-800 dark:text-slate-200 truncate">{currentUserName}</p>
+          <span className="text-xs text-amber-500 font-medium capitalize">
+            {currentRole === "ADMIN"
+              ? "Gerente"
+              : currentRole === "CASHIER"
+              ? "Caixa"
+              : "Garçom"}
+          </span>
         </div>
-      </div>
+      )}
 
-      <div className="px-6 pb-6 mb-2 border-b border-slate-200 dark:border-slate-800">
-        <p className="text-xs text-slate-500 uppercase font-semibold mb-1">
-          Logado como
-        </p>
-        <p className="font-medium text-slate-800 dark:text-slate-200 truncate">
-          {currentUserName}
-        </p>
-        <span className="text-xs text-amber-500 font-medium capitalize">
-          {currentRole === "ADMIN"
-            ? "Gerente"
-            : currentRole === "CASHIER"
-            ? "Caixa"
-            : "Garçom"}
-        </span>
-      </div>
-
-      <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+      <nav className={`flex-1 ${isMobile ? 'px-1 py-4 space-y-2' : isOpen ? 'px-4 py-4 space-y-1' : 'px-1 py-4 space-y-2'} overflow-y-auto`}> 
         {navItems
           .filter((item) => currentRole && item.roles.includes(currentRole))
           .map((item) => {
@@ -222,36 +268,38 @@ export default function Sidebar({ isOpen }: SidebarProps) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors font-medium ${
+                className={`flex flex-col items-center ${isMobile ? 'p-2' : isOpen ? 'flex-row gap-3 px-4 py-3' : 'justify-center p-3'} rounded-lg transition-colors font-medium ${
                   isActive
                     ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/10"
                     : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200"
                 }`}
+                title={item.label}
               >
                 {item.icon}
-                {item.label}
+                {(isOpen && !isMobile) && <span className="truncate">{item.label}</span>}
+                {isMobile && <span className="text-xs mt-1 text-center break-anywhere">{item.label}</span>}
               </Link>
             );
           })}
       </nav>
 
-      <div className="p-4 border-t border-slate-200 dark:border-slate-800 space-y-2">
+      <div className={`border-t border-slate-200 dark:border-slate-800 space-y-2 ${isMobile ? 'p-2 flex flex-col items-center' : isOpen ? 'p-4' : 'p-2 flex flex-col items-center'}`}>
         <button
           onClick={toggleTheme}
-          className="w-full flex items-center gap-3 px-4 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer transition-colors"
+          className={`flex items-center gap-3 rounded-lg cursor-pointer transition-colors w-full ${isMobile ? 'justify-center p-3' : isOpen ? 'px-4 py-3' : 'justify-center p-3'} text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800`}
         >
           {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
-          <span className="font-medium">
-            {theme === "dark" ? "Modo Claro" : "Modo Escuro"}
-          </span>
+          {(!isMobile && isOpen) && <span className="font-medium">{theme === "dark" ? "Modo Claro" : "Modo Escuro"}</span>}
+          {isMobile && <span className="text-xs mt-1">{theme === "dark" ? "Claro" : "Escuro"}</span>}
         </button>
 
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer transition-colors"
+          className={`flex items-center gap-3 rounded-lg cursor-pointer transition-colors w-full ${isMobile ? 'justify-center p-3' : isOpen ? 'px-4 py-3' : 'justify-center p-3'} text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800`}
         >
           <LogOut size={20} />
-          <span className="font-medium">Sair</span>
+          {(!isMobile && isOpen) && <span className="font-medium">Sair</span>}
+          {isMobile && <span className="text-xs mt-1">Sair</span>}
         </button>
       </div>
     </aside>

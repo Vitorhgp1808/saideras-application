@@ -250,8 +250,12 @@ async function getDetailedOrdersReport(from: Date, to: Date) {
     include: {
       items: {
         include: {
+          // CORREÇÃO AQUI:
           product: {
-            select: { name: true },
+            select: {
+              name: true,
+              category: true // Selecionamos a coluna 'category' diretamente
+            }
           },
         },
       },
@@ -285,6 +289,8 @@ async function getDetailedOrdersReport(from: Date, to: Date) {
       items: order.items.map((item) => ({
         id: item.id,
         name: item.product.name,
+        // CORREÇÃO AQUI: Acessamos direto a string, pois não é mais um objeto
+        category: item.product.category || "Geral", 
         quantity: item.quantity,
         price: Number(item.unitPrice),
         isCourtesy: item.isCourtesy,

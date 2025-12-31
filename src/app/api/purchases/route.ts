@@ -4,10 +4,11 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 const purchaseSchema = z.object({
-  productId: z.string().cuid(),
-  supplierId: z.string().cuid(),
+  productId: z.string(), // Alterado para string simples (para garantir)
+  supplierId: z.string(), // Alterado para string simples (para aceitar "sup-002")
   quantity: z.number().positive(),
   costPrice: z.number().positive(),
+  batch: z.string().optional(),
 });
 
 /**

@@ -32,6 +32,7 @@ export function ProductModal({
     minStockLevel: 0,
     category: ProductCategory.OTHER,
     imageUrl: "",
+    stock: 0,
   });
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export function ProductModal({
         minStockLevel: Number(product.minStockLevel),
         category: product.category || ProductCategory.OTHER,
         imageUrl: product.imageUrl,
+        stock: typeof product.stock === 'number' ? product.stock : 0,
       });
       setPreviewUrl(product.imageUrl || null);
     } else {
@@ -55,6 +57,7 @@ export function ProductModal({
         minStockLevel: 0,
         category: ProductCategory.OTHER,
         imageUrl: "",
+        stock: 0,
       });
       setPreviewUrl(null);
     }
@@ -109,8 +112,8 @@ export function ProductModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm p-2 sm:p-6">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl w-full max-w-[95vw] sm:max-w-2xl max-h-[95vh] overflow-y-auto p-4 sm:p-6 shadow-2xl">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">
             {product ? "Editar Produto" : "Novo Produto"}
@@ -262,6 +265,24 @@ export function ProductModal({
                   setFormData({
                     ...formData,
                     minStockLevel: parseFloat(e.target.value),
+                  })
+                }
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">
+                Estoque Atual
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                value={formData.stock}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    stock: parseFloat(e.target.value),
                   })
                 }
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500"

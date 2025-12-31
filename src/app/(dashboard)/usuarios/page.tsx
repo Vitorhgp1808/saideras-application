@@ -138,20 +138,20 @@ export default function UsuariosPage() {
         </Button>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm transition-colors duration-200">
-        <table className="w-full text-left">
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto shadow-sm transition-colors duration-200">
+        <table className="min-w-[600px] w-full text-left">
           <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 text-sm font-medium uppercase border-b border-slate-200 dark:border-slate-700">
             <tr>
-              <th className="px-6 py-4">Usuário</th>
-              <th className="px-6 py-4">Login</th>
-              <th className="px-6 py-4">Função</th>
-              <th className="px-6 py-4 text-right">Ações</th>
+              <th className="px-3 sm:px-6 py-4">Usuário</th>
+              <th className="px-3 sm:px-6 py-4">Login</th>
+              <th className="px-3 sm:px-6 py-4">Função</th>
+              <th className="px-3 sm:px-6 py-4 text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
             {users.map((user) => (
               <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                <td className="px-6 py-4">
+                <td className="px-3 sm:px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300">
                       <UserIcon size={16} />
@@ -159,10 +159,10 @@ export default function UsuariosPage() {
                     <span className="font-medium text-slate-900 dark:text-slate-200">{user.name}</span>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-slate-500 dark:text-slate-400 font-mono text-sm">
+                <td className="px-3 sm:px-6 py-4 text-slate-500 dark:text-slate-400 font-mono text-sm">
                   {user.username}
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-3 sm:px-6 py-4">
                   <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold uppercase
                     ${user.role === 'ADMIN' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400' : 
                       user.role === 'CASHIER' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 
@@ -173,7 +173,7 @@ export default function UsuariosPage() {
                     {roleNames[user.role]}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-right">
+                <td className="px-3 sm:px-6 py-4 text-right">
                   <div className="flex justify-end items-center gap-2">
                     <button 
                       onClick={() => handleEdit(user)}

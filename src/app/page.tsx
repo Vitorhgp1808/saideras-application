@@ -39,159 +39,81 @@ export default function HomePage() {
   };
 
   return (
-    <Stack direction="row" sx={{ minHeight: "100vh" }}>
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-          width: { xs: "100%", md: "50%" },
-          bgcolor: "grey.200",
-          px: { xs: 2, sm: 4, md: 10 },
-          py: 8,
-        }}
-      >
-        <Container maxWidth="sm">
-          <Paper
-            elevation={0}
-            sx={{
-              p: 4,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              bgcolor: "transparent",
-            }}
-          >
-            <Box sx={{ mb: 4 }}>
-              <Image
-                src="/saidera-logo.png"
-                alt="Logo Saideira"
-                width={400}
-                height={400}
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src =
-                    "https://placehold.co/80x80/f97316/ffffff?text=Logo";
-                  target.onerror = null;
-                }}
-              />
-            </Box>
-
-            <Box
-              component="form"
-              onSubmit={handleSubmit}
-              sx={{ width: "100%" }}
-            >
-              <Stack spacing={2}>
-                <TextField
-                  required
-                  fullWidth
-                  id="username"
-                  label="Usuário"
-                  name="username"
-                  autoComplete="username"
-                  autoFocus
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-                <TextField
-                  required
-                  fullWidth
-                  name="password"
-                  label="Senha"
-                  type="password"
-                  id="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-
-                {error && (
-                  <Alert severity="error" sx={{ width: "100%" }}>
-                    {error}
-                  </Alert>
-                )}
-
-                <Button
-                  type="submit"
-                  fullWidth
-                  variant="contained"
-                  sx={{
-                    py: 1.5,
-                    bgcolor: "warning.main",
-                    "&:hover": { bgcolor: "warning.dark" },
-                    transition: "transform 0.15s ease-in-out",
-                    "&:hover:not(:active)": {
-                      transform: "scale(1.02)",
-                    },
-                  }}
-                >
-                  Entrar
-                </Button>
-              </Stack>
-            </Box>
-          </Paper>
-        </Container>
-      </Box>
-
-      <Box
-        sx={{
-          display: { xs: "none", md: "flex" },
-          width: "50%",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundImage: "url(saidera-copos.png)",
-          position: "relative",
-        }}
-      >
-        <Box
-          sx={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            backgroundColor: "rgba(120, 53, 15, 0.4)",
-            display: "flex",
-            alignItems: "flex-end",
-            justifyContent: "center",
-            pb: 16,
-          }}
-        >
-          <Typography
-            component="h2"
-            align="center"
-            sx={{
-              px: { xs: 2, sm: 6 },
-              fontSize: {
-                xs: "2.25rem",
-                md: "3rem",
-                lg: "3.75rem",
-              },
-              fontWeight: "900",
-              fontStyle: "italic",
-              letterSpacing: "0.05em",
-              textTransform: "uppercase",
-              textShadow:
-                "0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08)",
-              transform: "translateY(1rem)",
-            }}
-          >
-            <Box
-              component="span"
+    <div className="flex flex-col md:flex-row min-h-screen w-full">
+      <div className="flex flex-col justify-center items-center w-full md:w-1/2 bg-gray-100 px-4 py-8">
+        <div className="w-full max-w-sm mx-auto">
+          <div className="flex flex-col items-center mb-6">
+            <Image
+              src="/saidera-logo.png"
+              alt="Logo Saideira"
+              width={180}
+              height={180}
+              style={{ maxWidth: '100%', height: 'auto' }}
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.src = "https://placehold.co/80x80/f97316/ffffff?text=Logo";
+                target.onerror = null;
+              }}
+            />
+          </div>
+          <form onSubmit={handleSubmit} className="w-full space-y-4">
+            <TextField
+              required
+              fullWidth
+              id="username"
+              label="Usuário"
+              name="username"
+              autoComplete="username"
+              autoFocus
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              InputProps={{ className: 'break-anywhere' }}
+            />
+            <TextField
+              required
+              fullWidth
+              name="password"
+              label="Senha"
+              type="password"
+              id="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              InputProps={{ className: 'break-anywhere' }}
+            />
+            {error && (
+              <Alert severity="error" sx={{ width: "100%" }}>
+                {error}
+              </Alert>
+            )}
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
               sx={{
-                background:
-                  "linear-gradient(to right, #FDE68A, #FEF3C7, #FFFFFF)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
+                py: 1.5,
+                bgcolor: "warning.main",
+                "&:hover": { bgcolor: "warning.dark" },
+                transition: "transform 0.15s ease-in-out",
+                "&:hover:not(:active)": {
+                  transform: "scale(1.02)",
+                },
               }}
             >
+              Entrar
+            </Button>
+          </form>
+        </div>
+      </div>
+      <div className="hidden md:flex w-1/2 relative bg-cover bg-center" style={{ backgroundImage: 'url(/saidera-copos.png)' }}>
+        <div className="absolute inset-0 bg-[rgba(120,53,15,0.4)] flex items-end justify-center pb-16">
+          <h2 className="px-4 sm:px-8 text-2xl md:text-3xl lg:text-5xl font-extrabold italic uppercase text-white text-center drop-shadow-lg" style={{ WebkitTextStroke: '1px #fbbf24' }}>
+            <span className="bg-gradient-to-r from-yellow-300 via-yellow-100 to-white bg-clip-text text-transparent">
               “O melhor chope é o da Saideira ”
-            </Box>
-          </Typography>
-        </Box>
-      </Box>
-    </Stack>
+            </span>
+          </h2>
+        </div>
+      </div>
+    </div>
   );
 }

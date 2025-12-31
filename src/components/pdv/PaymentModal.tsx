@@ -30,8 +30,8 @@ export function PaymentModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm p-2 sm:p-6">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl w-full max-w-[95vw] sm:max-w-md p-4 sm:p-6 shadow-2xl overflow-y-auto max-h-[95vh]">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
             Pagamento

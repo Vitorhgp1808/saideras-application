@@ -44,23 +44,24 @@ export function TableGrid({
   return (
     <div className="p-6 flex flex-col h-full">
       {/* Header com Filtros */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-6">
         <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
           Comandas
         </h2>
-        
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+        {/* Filtros responsivos: scroll horizontal no mobile */}
+        <div className="flex overflow-x-auto no-scrollbar bg-slate-100 dark:bg-slate-800 p-1 rounded-lg gap-1 sm:gap-2 w-full sm:w-auto">
           {(['TODAS', 'ABERTAS', 'LIVRES'] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className={`
-                px-4 py-2 rounded-md text-sm font-medium transition-colors
+                flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-colors
                 ${filter === f 
                   ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm' 
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                 }
               `}
+              style={{ minWidth: 80 }}
             >
               {f.charAt(0) + f.slice(1).toLowerCase()}
             </button>
@@ -68,7 +69,7 @@ export function TableGrid({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 overflow-y-auto pb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3 md:gap-4 overflow-y-auto pb-4">
         {filteredSlots.map((slot) => {
           const isSelected = slot.order?.id === selectedComandaId;
           
@@ -118,7 +119,7 @@ export function TableGrid({
                   <span className="block text-sm font-medium opacity-60">Disponível</span>
                 ) : (
                   <>
-                    <span className="block font-bold text-lg truncate w-full">
+                    <span className="block font-bold text-lg truncate w-full break-anywhere">
                       {formatCurrency(slot.order?.total || 0)}
                     </span>
                   </>

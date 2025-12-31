@@ -68,7 +68,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { prisma } from "@/src/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { Prisma, ProductCategory } from "@prisma/client";
 import { getAuth } from "../api/authUtils"; // Ajuste o caminho conforme sua estrutura
 
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { name, description, sellingPrice, unitOfMeasure, minStockLevel, category, imageUrl } = body;
+    const { name, description, sellingPrice, unitOfMeasure, minStockLevel, category, imageUrl, modifierGroups } = body;
 
     if (!name || !sellingPrice || !unitOfMeasure || !category) {
       return NextResponse.json({ message: 'Campos obrigatórios (name, sellingPrice, unitOfMeasure, category) não foram preenchidos.' }, { status: 400 });
@@ -117,6 +117,7 @@ export async function POST(req: NextRequest) {
       console.warn(`Categoria '${category}' não reconhecida. Usando 'OTHER'.`);
     }
 
+    // Criação do produto principal
     const newProduct = await prisma.product.create({
       data: {
         name,
@@ -129,7 +130,47 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json(newProduct, { status: 201 });
+    // Se houver grupos de modificadores, criar
+    if (modifierGroups && Array.isArray(modifierGroups)) {
+      for (const group of modifierGroups) {
+        const { name: groupName, minSelections, maxSelections, items } = group;
+        const createdGroup = await prisma.modifierGroup.create({
+          data: {
+            name: groupName,
+            minSelections: minSelections ?? 0,
+            maxSelections: maxSelections ?? 1,
+            productId: newProduct.id,
+          },
+        });
+        // Criar itens do grupo
+        if (items && Array.isArray(items)) {
+          for (const item of items) {
+            await prisma.modifierItem.create({
+              data: {
+                name: item.name ?? '',
+                priceExtra: item.priceExtra ? new Prisma.Decimal(item.priceExtra) : undefined,
+                modifierGroupId: createdGroup.id,
+                productId: item.productId ?? undefined,
+              },
+            });
+          }
+        }
+      }
+    }
+
+    // Retornar produto com grupos e itens
+    const fullProduct = await prisma.product.findUnique({
+      where: { id: newProduct.id },
+      include: {
+        modifierGroups: {
+          include: {
+            items: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(fullProduct, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {
