@@ -118,7 +118,7 @@ export default function DashboardPage() {
         <Card>
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Mesas Ativas</p>
+              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Pedidos ativos</p>
               <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
                 {stats.activeTables}
               </h3>
