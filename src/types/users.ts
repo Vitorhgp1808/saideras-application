@@ -11,4 +11,5 @@ export type User = {
   password?: string; // Opcional, apenas para envio
   role: UserRole;
   createdAt: string;
+  deletedAt?: string | null;
 };

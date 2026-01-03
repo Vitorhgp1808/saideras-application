@@ -15,7 +15,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { marmitas = [], nome } = body;
+    const { marmitas = [], nome, paymentMethod } = body;
     if (!Array.isArray(marmitas) || marmitas.length === 0) {
       return NextResponse.json({ error: "É necessário ao menos uma marmita." }, { status: 400 });
     }
@@ -75,7 +75,31 @@ export async function POST(req: Request) {
         items: { include: { modifiers: true } },
       },
     });
-    return NextResponse.json(order, { status: 201 });
+
+    // Se paymentMethod foi enviado, cria o pagamento
+    let payment = null;
+    if (paymentMethod) {
+      // Buscar o caixa aberto do usuário (waiter) para associar ao pagamento
+      const cashier = await prisma.cashier.findFirst({
+        where: {
+          closingDate: null,
+          openedById: auth.user.id,
+        },
+      });
+      if (!cashier) {
+        return NextResponse.json({ error: "Nenhum caixa aberto encontrado para o usuário." }, { status: 400 });
+      }
+      payment = await prisma.payment.create({
+        data: {
+          amount: subtotal,
+          paymentMethod,
+          orderId: order.id,
+          cashierId: cashier.id,
+        },
+      });
+    }
+
+    return NextResponse.json({ ...order, payment }, { status: 201 });
   } catch (error) {
     console.error("Error creating marmita order:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

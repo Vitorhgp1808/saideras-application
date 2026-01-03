@@ -64,6 +64,25 @@ export async function PUT(
       );
     }
 
+    // Extrai dados do pagamento do corpo da requisição
+    const body = await req.json();
+    const { amount, paymentMethod } = body;
+    if (!amount || !paymentMethod) {
+      return NextResponse.json({ error: "amount e paymentMethod são obrigatórios." }, { status: 400 });
+    }
+
+    // Buscar o caixa aberto do usuário (cashier)
+    const cashier = await prisma.cashier.findFirst({
+      where: {
+        closingDate: null,
+        openedById: auth.user.id,
+      },
+    });
+    if (!cashier) {
+      return NextResponse.json({ error: "Nenhum caixa aberto encontrado para o usuário." }, { status: 400 });
+    }
+
+    // Fecha o pedido
     const closedOrder = await prisma.order.update({
       where: { id: orderId },
       data: {
@@ -71,8 +90,17 @@ export async function PUT(
         closedAt: new Date(),
       },
     });
+    // Cria o pagamento
+    const payment = await prisma.payment.create({
+      data: {
+        amount,
+        paymentMethod,
+        orderId: closedOrder.id,
+        cashierId: cashier.id,
+      },
+    });
 
-    return NextResponse.json(closedOrder);
+    return NextResponse.json({ ...closedOrder, payment });
   } catch (error) {
     console.error(`Error closing order ${orderId}:`, error);
     return NextResponse.json(

@@ -4,6 +4,23 @@ import { UserRole } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import jwt, { JwtPayload } from "jsonwebtoken";
 
+async function getAuthenticatedUser(request: NextRequest) {
+  const authHeader = request.headers.get("Authorization");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    throw new Error("Token de autenticação não fornecido.");
+  }
+  const token = authHeader.split(" ")[1];
+  try {
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET as string
+    ) as JwtPayload;
+    return decoded;
+  } catch (error) {
+    throw new Error("Token inválido ou expirado.");
+  }
+}
+
 async function getAuthManager(request: NextRequest) {
   const authHeader = request.headers.get("Authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -55,8 +72,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await getAuthManager(request);
+    const currentUser = await getAuthenticatedUser(request);
+    
     const { id } = await params;
+
+
+    const isAdmin = currentUser.role === UserRole.ADMIN;
+    const isSelf = currentUser.id === id || currentUser.sub === id; // você gera o token
+
+    if (!isAdmin && !isSelf) {
+        return NextResponse.json(
+            { message: "Acesso não autorizado. Você só pode ver seu próprio perfil." }, 
+            { status: 403 }
+        );
+    }
 
     const user = await prisma.user.findUnique({
       where: { id },
@@ -74,7 +103,8 @@ export async function GET(
     return NextResponse.json(user);
 
   } catch (error: unknown) {
-    if (error instanceof Error && (error.message.includes("autorizado") || error.message.includes("Token"))) {
+    // Tratamento de erro ajustado
+    if (error instanceof Error && (error.message.includes("Token") || error.message.includes("fornecido"))) {
       return NextResponse.json({ message: error.message }, { status: 401 });
     }
     console.error("Erro ao buscar usuário:", error);
@@ -210,8 +240,10 @@ export async function DELETE(
     await getAuthManager(request);
     const { id } = await params;
 
-    await prisma.user.delete({
+
+    await prisma.user.update({
       where: { id },
+      data: { deletedAt: new Date() },
     });
 
     return new NextResponse(null, { status: 204 });

@@ -12,7 +12,7 @@ export async function POST(_req: Request, context: RouteContext) {
   const { id } = params;
 
   try {
-    // Atualiza o item da marmita
+    // Atualiza o item da 
     const orderItem = await prisma.orderItem.update({
       where: { id },
       data: { baixadoNaCozinha: true },

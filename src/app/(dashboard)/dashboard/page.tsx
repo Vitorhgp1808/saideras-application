@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Toast } from '../../../components/ui/Toast';
 import { DollarSign, TrendingUp, AlertTriangle, Package } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card } from "../../../components/ui/Card";
@@ -25,6 +26,14 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Toast de erro
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimeout = useRef<NodeJS.Timeout | null>(null);
+  function showToast(msg: string) {
+    setToastMsg(msg);
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setToastMsg(null), 4000);
+  }
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -46,8 +55,10 @@ export default function DashboardPage() {
         console.error(err);
         if (err instanceof Error) {
           setError(err.message);
+          showToast(err.message);
         } else {
           setError("Erro desconhecido");
+          showToast("Erro desconhecido");
         }
       } finally {
         setIsLoading(false);
@@ -67,14 +78,20 @@ export default function DashboardPage() {
 
   if (error || !stats) {
     return (
-      <div className="p-8 text-center text-red-500">
-        Erro ao carregar dashboard: {error}
-      </div>
+      <>
+        <Toast message={error || "Erro ao carregar dashboard"} type="error" onClose={() => setToastMsg(null)} />
+        <div className="p-8 text-center text-red-500">
+          Erro ao carregar dashboard: {error}
+        </div>
+      </>
     );
   }
 
   return (
     <div className="p-6 md:p-8 animate-fade-in space-y-6">
+      {toastMsg && (
+        <Toast message={toastMsg} type="error" onClose={() => setToastMsg(null)} />
+      )}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Visão Geral</h1>
         <span className="text-slate-500 dark:text-slate-400 text-sm">
@@ -144,7 +161,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Sales Chart */}
         <div className="lg:col-span-2">
-          <Card className="h-full min-h-[400px]">
+          <Card className="h-full min-h-100">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-6">Faturamento Semanal</h3>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">

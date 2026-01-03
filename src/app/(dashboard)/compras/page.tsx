@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
+import { Toast } from '../../../components/ui/Toast';
 import {
   Truck,
   Calendar,
@@ -38,6 +39,17 @@ export default function ComprasPage() {
 
   const isLoading = isPurchasesLoading || isProductsLoading || isSuppliersLoading;
   const error = purchasesError || productsError || suppliersError;
+
+  // Toast de erro/sucesso
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'error' | 'success' | 'info'>('error');
+  const toastTimeout = useRef<NodeJS.Timeout | null>(null);
+  function showToast(msg: string, type: 'error' | 'success' | 'info' = 'error') {
+    setToastMsg(msg);
+    setToastType(type);
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setToastMsg(null), 4000);
+  }
 
   // --- Purchase Entry State ---
   const [newPurchase, setNewPurchase] = useState({
@@ -97,14 +109,12 @@ export default function ComprasPage() {
       !newPurchase.quantity ||
       !newPurchase.costPrice
     ) {
-      alert("Por favor preencha os campos obrigatórios");
+      showToast("Por favor preencha os campos obrigatórios", 'error');
       return;
     }
-
     try {
       const headers = getAuthHeaders();
       if (!headers) return;
-
       const res = await fetch("/api/purchases", {
         method: "POST",
         headers,
@@ -117,9 +127,11 @@ export default function ComprasPage() {
           expiryDate: newPurchase.expiryDate || undefined,
         }),
       });
-
-      if (!res.ok) throw new Error("Erro ao registrar compra.");
-
+      if (!res.ok) {
+        const err = await res.json();
+        showToast(err.error || err.message || "Erro ao registrar compra.", 'error');
+        return;
+      }
       setNewPurchase({
         supplierId: "",
         productId: "",
@@ -128,12 +140,10 @@ export default function ComprasPage() {
         batch: "",
         expiryDate: "",
       });
-
-      alert("Compra registrada e estoque atualizado!");
+      showToast("Compra registrada e estoque atualizado!", 'success');
       mutate(`/api/purchases?startDate=${dateStart}&endDate=${dateEnd}`);
     } catch (err) {
-      if (err instanceof Error) alert(err.message);
-      else alert("Erro desconhecido");
+      showToast(err instanceof Error ? err.message : "Erro desconhecido", 'error');
     }
   };
 
@@ -143,16 +153,13 @@ export default function ComprasPage() {
       .split(",")
       .map((s) => s.trim())
       .filter((s) => s !== "");
-
     try {
       const headers = getAuthHeaders();
       if (!headers) return;
-
       const url = editingSupplierId
         ? `/api/suppliers/${editingSupplierId}`
         : "/api/suppliers";
       const method = editingSupplierId ? "PUT" : "POST";
-
       const res = await fetch(url, {
         method,
         headers,
@@ -163,33 +170,37 @@ export default function ComprasPage() {
           productsProvided: productsArray,
         }),
       });
-
-      if (!res.ok) throw new Error("Erro ao salvar fornecedor.");
-
+      if (!res.ok) {
+        const err = await res.json();
+        showToast(err.error || err.message || "Erro ao salvar fornecedor.", 'error');
+        return;
+      }
       setIsSupplierModalOpen(false);
+      showToast(editingSupplierId ? "Fornecedor atualizado!" : "Fornecedor cadastrado!", 'success');
       mutate('/api/suppliers');
     } catch (err) {
-      if (err instanceof Error) alert(err.message);
-      else alert("Erro desconhecido");
+      showToast(err instanceof Error ? err.message : "Erro desconhecido", 'error');
     }
   };
 
   const handleDeleteSupplier = async (id: string) => {
     if (!window.confirm("Excluir fornecedor?")) return;
-
     try {
       const headers = getAuthHeaders();
       if (!headers) return;
-
       const res = await fetch(`/api/suppliers/${id}`, {
         method: "DELETE",
         headers,
       });
-      if (!res.ok) throw new Error("Erro ao excluir fornecedor.");
+      if (!res.ok) {
+        const err = await res.json();
+        showToast(err.error || err.message || "Erro ao excluir fornecedor.", 'error');
+        return;
+      }
+      showToast("Fornecedor excluído!", 'success');
       mutate('/api/suppliers');
     } catch (err) {
-      if (err instanceof Error) alert(err.message);
-      else alert("Erro desconhecido");
+      showToast(err instanceof Error ? err.message : "Erro desconhecido", 'error');
     }
   };
 
@@ -226,14 +237,20 @@ export default function ComprasPage() {
 
   if (error) {
     return (
-      <div className="p-8 text-center text-red-500">
-        Erro ao carregar dados: {error instanceof Error ? error.message : 'Erro desconhecido'}
-      </div>
+      <>
+        <Toast message={error instanceof Error ? error.message : 'Erro ao carregar dados'} type="error" onClose={() => setToastMsg(null)} />
+        <div className="p-8 text-center text-red-500">
+          Erro ao carregar dados: {error instanceof Error ? error.message : 'Erro desconhecido'}
+        </div>
+      </>
     );
   }
 
   return (
     <div className="p-6 md:p-8 space-y-8 animate-fade-in">
+      {toastMsg && (
+        <Toast message={toastMsg} type={toastType} onClose={() => setToastMsg(null)} />
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Register Purchase Form */}
         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-colors duration-200">
@@ -389,7 +406,7 @@ export default function ComprasPage() {
               <Plus size={14} /> Novo
             </button>
           </div>
-          <div className="space-y-4 flex-1 overflow-y-auto max-h-[400px] pr-2">
+          <div className="space-y-4 flex-1 overflow-y-auto max-h-100 pr-2">
             {suppliers.map((supplier) => (
               <div
                 key={supplier.id}

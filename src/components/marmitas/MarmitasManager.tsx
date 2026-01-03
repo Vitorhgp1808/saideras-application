@@ -1,5 +1,6 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import { Toast } from "@/components/ui/Toast";
 import { Marmita, MarmitaFormValues } from "@/types/marmitas";
 import { MarmitasList } from "./MarmitasList";
 import { MarmitaForm } from "./MarmitaForm";
@@ -7,6 +8,14 @@ import ModifiersPanel from "./ModifiersPanel";
 import Modal from "@/components/ui/Modal";
 
 export default function MarmitasManager() {
+   // Toast de erro
+  const [errorToast, setErrorToast] = useState<string | null>(null);
+  const toastTimeout = useRef<NodeJS.Timeout | null>(null);
+  function showErrorToast(msg: string) {
+    setErrorToast(msg);
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setErrorToast(null), 4000);
+  }
   const [marmitas, setMarmitas] = useState<Marmita[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Marmita | null>(null);
@@ -25,10 +34,20 @@ export default function MarmitasManager() {
 
   async function fetchMarmitas() {
     setLoading(true);
-    const headers = getAuthHeaders();
-    const res = await fetch("/api/marmitas", { headers });
-    const data = await res.json();
-    setMarmitas(data);
+    try {
+      const headers = getAuthHeaders();
+      const res = await fetch("/api/marmitas", { headers });
+      if (!res.ok) {
+        const err = await res.json();
+        showErrorToast(err.error || err.message || "Erro ao buscar marmitas.");
+        setLoading(false);
+        return;
+      }
+      const data = await res.json();
+      setMarmitas(data);
+    } catch (error) {
+      showErrorToast("Erro ao buscar marmitas.");
+    }
     setLoading(false);
   }
 
@@ -64,12 +83,10 @@ export default function MarmitasManager() {
       });
       // Não precisa fazer fetchMarmitas() aqui se a atualização otimista funcionou, economiza requisição.
     } catch (error) {
-      console.error("Erro ao atualizar status", error);
-      // Reverte a mudança se der erro na API
+      showErrorToast("Erro ao atualizar o status da marmita.");
       setMarmitas((prev) =>
         prev.map((m) => (m.id === marmita.id ? { ...m, active: !active } : m))
       );
-      alert("Erro ao atualizar o status da marmita.");
     }
   }
   // ------------------------------------
@@ -77,36 +94,60 @@ export default function MarmitasManager() {
   async function handleDelete(marmita: Marmita) {
     if (!confirm(`Excluir marmita "${marmita.name}"?`)) return;
     const headers = getAuthHeaders();
-    await fetch(`/api/marmitas/${marmita.id}`, { method: "DELETE", headers });
-    fetchMarmitas();
+    try {
+      const res = await fetch(`/api/marmitas/${marmita.id}`, { method: "DELETE", headers });
+      if (!res.ok) {
+        const err = await res.json();
+        showErrorToast(err.error || err.message || "Erro ao excluir marmita.");
+        return;
+      }
+      fetchMarmitas();
+    } catch (error) {
+      showErrorToast("Erro ao excluir marmita.");
+    }
   }
 
   async function handleSubmit(values: MarmitaFormValues) {
     const headers = getAuthHeaders();
-    if (editing) {
-      await fetch(`/api/marmitas/${editing.id}`, {
-        method: "PUT",
-        headers,
-        body: JSON.stringify(values),
-      });
+    try {
+      if (editing) {
+        const res = await fetch(`/api/marmitas/${editing.id}`, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify(values),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          showErrorToast(err.error || err.message || "Erro ao editar marmita.");
+          setShowForm(false);
+          fetchMarmitas();
+          return;
+        }
+        setShowForm(false);
+        fetchMarmitas();
+      } else {
+        const res = await fetch("/api/marmitas", {
+          method: "POST",
+          headers,
+          body: JSON.stringify(values),
+        });
+        if (res.ok) {
+          const newMarmita = await res.json();
+          setShowForm(false);
+          fetchMarmitas();
+          setEditing(newMarmita);
+          setShowModifiersModal(newMarmita.id);
+        } else {
+          const err = await res.json();
+          showErrorToast(err.error || err.message || "Erro ao criar marmita.");
+          setShowForm(false);
+          fetchMarmitas();
+        }
+      }
+    } catch (error) {
+      showErrorToast("Erro ao salvar marmita.");
       setShowForm(false);
       fetchMarmitas();
-    } else {
-      const res = await fetch("/api/marmitas", {
-        method: "POST",
-        headers,
-        body: JSON.stringify(values),
-      });
-      if (res.ok) {
-        const newMarmita = await res.json();
-        setShowForm(false);
-        fetchMarmitas();
-        setEditing(newMarmita);
-        setShowModifiersModal(newMarmita.id);
-      } else {
-        setShowForm(false);
-        fetchMarmitas();
-      }
     }
   }
 
@@ -183,6 +224,9 @@ export default function MarmitasManager() {
           />
         )}
       </div>
+    {errorToast && (
+      <Toast message={errorToast} type="error" onClose={() => setErrorToast(null)} />
+    )}
     </div>
   );
 }

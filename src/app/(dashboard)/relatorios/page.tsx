@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { Toast } from '../../../components/ui/Toast';
 import { 
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, Legend
@@ -46,6 +47,14 @@ export default function RelatoriosPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Toast de erro
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimeout = useRef<NodeJS.Timeout | null>(null);
+  function showToast(msg: string) {
+    setToastMsg(msg);
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setToastMsg(null), 4000);
+  }
 
   const fetchReports = async () => {
     setIsLoading(true);
@@ -53,21 +62,20 @@ export default function RelatoriosPage() {
     try {
       const token = localStorage.getItem("authToken");
       if (!token) throw new Error("Não autorizado");
-
       const params = new URLSearchParams({ from: dateStart, to: dateEnd });
       const res = await fetch(`/api/reports/detailed_orders?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-
       if (!res.ok) throw new Error("Falha ao carregar dados");
-      
       const data = await res.json();
       setOrders(data);
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);
+        showToast(err.message);
       } else {
         setError("Ocorreu um erro desconhecido");
+        showToast("Ocorreu um erro desconhecido");
       }
     } finally {
       setIsLoading(false);
@@ -208,14 +216,20 @@ export default function RelatoriosPage() {
 
   if (error) {
     return (
-      <div className="p-8 text-center text-red-500">
-        Erro ao carregar relatório: {error}
-      </div>
+      <>
+        <Toast message={error} type="error" onClose={() => setToastMsg(null)} />
+        <div className="p-8 text-center text-red-500">
+          Erro ao carregar relatório: {error}
+        </div>
+      </>
     );
   }
 
   return (
     <div className="space-y-6 animate-fade-in pb-10 p-6">
+      {toastMsg && (
+        <Toast message={toastMsg} type="error" onClose={() => setToastMsg(null)} />
+      )}
       {/* Header & Filters */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -245,7 +259,7 @@ export default function RelatoriosPage() {
                     }`}
                 >
                     <Utensils size={14} />
-                    Marmitas
+                    Delivery
                 </button>
                 <button
                     onClick={() => setProductFilter('outros')}
@@ -262,7 +276,7 @@ export default function RelatoriosPage() {
 
             {/* Seletor de Data */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-white dark:bg-slate-800 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm min-w-0">
-                <div className="px-3 py-1.5 flex items-center gap-2 border-b sm:border-b-0 sm:border-r border-slate-200 dark:border-slate-700 min-w-[110px]">
+                <div className="px-3 py-1.5 flex items-center gap-2 border-b sm:border-b-0 sm:border-r border-slate-200 dark:border-slate-700 min-w-27.5">
                     <Filter size={16} className="text-amber-500" />
                     <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Período</span>
                 </div>
@@ -271,14 +285,14 @@ export default function RelatoriosPage() {
                     type="date" 
                     value={dateStart}
                     onChange={(e) => setDateStart(e.target.value)}
-                    className="bg-transparent text-sm text-slate-600 dark:text-slate-300 focus:outline-none px-2 py-1 min-w-[120px]"
+                    className="bg-transparent text-sm text-slate-600 dark:text-slate-300 focus:outline-none px-2 py-1 min-w-30"
                     />
                     <span className="text-slate-400 hidden sm:inline">-</span>
                     <input 
                     type="date" 
                     value={dateEnd}
                     onChange={(e) => setDateEnd(e.target.value)}
-                    className="bg-transparent text-sm text-slate-600 dark:text-slate-300 focus:outline-none px-2 py-1 min-w-[120px]"
+                    className="bg-transparent text-sm text-slate-600 dark:text-slate-300 focus:outline-none px-2 py-1 min-w-30"
                     />
                 </div>
             </div>

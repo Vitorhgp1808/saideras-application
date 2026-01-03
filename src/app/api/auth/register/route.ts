@@ -56,18 +56,27 @@ export async function POST(request: Request) {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    await prisma.user.create({
+
+    const newUser = await prisma.user.create({
       data: {
         name,
         username,
         password: hashedPassword,
-  
+      },
+    });
+
+    // Cria um cashier para o usuário recém-criado
+    await prisma.cashier.create({
+      data: {
+        openedById: newUser.id,
+        openingDate: new Date(),
+        initialAmount: 0,
       },
     });
 
     return NextResponse.json(
       { message: 'Usuário criado com sucesso' },
-      { status: 201 } 
+      { status: 201 }
     );
 
   } catch (error) {

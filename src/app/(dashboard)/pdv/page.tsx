@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { Toast } from '../../../components/ui/Toast';
+
 import type { Order, Product } from "../../../types/pdv";
 import { TableGrid, ComandaSlot } from "../../../components/pdv/TableGrid";
 import { OrderPanel } from "../../../components/pdv/OrderPanel";
@@ -11,6 +13,14 @@ import { fetcher } from '../../../lib/fetcher';
 const COMANDA_COUNT = 30; // Número fixo de comandas
 
 export default function PdvPage() {
+    // Toast de erro
+  const [errorToast, setErrorToast] = useState<string | null>(null);
+  const toastTimeout = useRef<NodeJS.Timeout | null>(null);
+  function showErrorToast(msg: string) {
+    setErrorToast(msg);
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setErrorToast(null), 4000);
+  }
   const today = useMemo(() => new Date().toISOString().split("T")[0], []);
   const {
     data: ordersData,
@@ -106,7 +116,6 @@ export default function PdvPage() {
     try {
       const token = localStorage.getItem("authToken");
       if (!token) throw new Error("Não autorizado.");
-
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: {
@@ -115,21 +124,17 @@ export default function PdvPage() {
         },
         body: JSON.stringify({ table: selectedTableNumber }),
       });
-
       if (!res.ok) {
         const errData = await res.json();
-        throw new Error(errData.message || "Falha ao criar comanda");
+        showErrorToast(errData.error || errData.message || "Falha ao criar comanda");
+        return;
       }
-
       const newOrder = await res.json();
       mutate(`/api/orders?date=${today}`);
-
-      // Auto-select the newly created order
-      setSelectedTableNumber(null); // Reset table selection
+      setSelectedTableNumber(null);
       setSelectedComanda(newOrder);
     } catch (err) {
-      if (err instanceof Error) console.error(err.message);
-      else console.error("Erro desconhecido");
+      showErrorToast(err instanceof Error ? err.message : "Erro desconhecido");
     }
   };
 
@@ -149,7 +154,6 @@ export default function PdvPage() {
     try {
       const token = localStorage.getItem("authToken");
       if (!token) throw new Error("Não autorizado.");
-
       const res = await fetch(
         `/api/orders/${encodeURIComponent(selectedComanda.id)}/items`,
         {
@@ -161,16 +165,14 @@ export default function PdvPage() {
           body: JSON.stringify({ productId, quantity }),
         }
       );
-
       if (!res.ok) {
         const errData = await res.json();
-        throw new Error(errData.message || "Falha ao adicionar item");
+        showErrorToast(errData.error || errData.message || "Falha ao adicionar item");
+        return;
       }
-
       mutate(`/api/orders?date=${today}`);
     } catch (err) {
-      if (err instanceof Error) console.error(err.message);
-      else console.error("Erro desconhecido");
+      showErrorToast(err instanceof Error ? err.message : "Erro desconhecido");
     }
   };
 
@@ -181,7 +183,6 @@ export default function PdvPage() {
     try {
       const token = localStorage.getItem("authToken");
       if (!token) throw new Error("Não autorizado.");
-
       const res = await fetch(
         `/api/orders/${selectedComanda.id}/items/${itemId}`,
         {
@@ -192,12 +193,14 @@ export default function PdvPage() {
           },
         }
       );
-
-      if (!res.ok) throw new Error("Falha ao remover item");
-
+      if (!res.ok) {
+        const errData = await res.json();
+        showErrorToast(errData.error || errData.message || "Falha ao remover item");
+        return;
+      }
       mutate(`/api/orders?date=${today}`);
     } catch (err) {
-      if (err instanceof Error) console.error(err.message);
+      showErrorToast(err instanceof Error ? err.message : "Erro desconhecido");
     }
   };
 
@@ -210,7 +213,6 @@ export default function PdvPage() {
     try {
       const token = localStorage.getItem("authToken");
       if (!token) throw new Error("Não autorizado.");
-
       const res = await fetch(
         `/api/orders/${selectedComanda.id}/items/${itemId}`,
         {
@@ -222,12 +224,14 @@ export default function PdvPage() {
           body: JSON.stringify({ isCourtesy: !currentStatus }),
         }
       );
-
-      if (!res.ok) throw new Error("Falha ao atualizar cortesia");
-
+      if (!res.ok) {
+        const errData = await res.json();
+        showErrorToast(errData.error || errData.message || "Falha ao atualizar cortesia");
+        return;
+      }
       mutate(`/api/orders?date=${today}`);
     } catch (err) {
-      if (err instanceof Error) console.error(err.message);
+      showErrorToast(err instanceof Error ? err.message : "Erro desconhecido");
     }
   };
 
@@ -248,7 +252,6 @@ export default function PdvPage() {
     try {
       const token = localStorage.getItem("authToken");
       if (!token) throw new Error("Não autorizado.");
-
       const res = await fetch(`/api/orders/${selectedComanda.id}`, {
         method: "DELETE",
         headers: {
@@ -256,17 +259,15 @@ export default function PdvPage() {
           Authorization: `Bearer ${token}`,
         },
       });
-
       if (!res.ok) {
         const errData = await res.json();
-        throw new Error(errData.message || "Falha ao cancelar comanda");
+        showErrorToast(errData.error || errData.message || "Falha ao cancelar comanda");
+        return;
       }
-
       mutate(`/api/orders?date=${today}`);
       setSelectedComanda(null);
     } catch (err) {
-      if (err instanceof Error) console.error(err.message);
-      else console.error("Erro desconhecido");
+      showErrorToast(err instanceof Error ? err.message : "Erro desconhecido");
     }
   };
 
@@ -279,27 +280,24 @@ export default function PdvPage() {
     try {
       const token = localStorage.getItem("authToken");
       if (!token) throw new Error("Não autorizado.");
-
       const res = await fetch(`/api/orders/${selectedComanda.id}/close`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ paymentMethod: method }),
+        body: JSON.stringify({ paymentMethod: method, amount: selectedComanda.total }),
       });
-
       if (!res.ok) {
         const errData = await res.json();
-        throw new Error(errData.message || "Falha ao fechar comanda");
+        showErrorToast(errData.error || errData.message || "Falha ao fechar comanda");
+        return;
       }
-
       mutate(`/api/orders?date=${today}`);
       setIsPaymentModalOpen(false);
       setSelectedComanda(null);
     } catch (err) {
-      if (err instanceof Error) console.error(err.message);
-      else console.error("Erro desconhecido");
+      showErrorToast(err instanceof Error ? err.message : "Erro desconhecido");
     } finally {
       setIsProcessingPayment(false);
     }
@@ -315,15 +313,18 @@ export default function PdvPage() {
 
   if (error) {
     return (
-      <div className="flex h-screen items-center justify-center p-4">
-        <div
-          className="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg shadow-md"
-          role="alert"
-        >
-          <strong className="font-bold">Erro: </strong>
-          <span className="block sm:inline">{error instanceof Error ? error.message : 'Erro desconhecido'}</span>
+      <>
+        <Toast message={error instanceof Error ? error.message : 'Erro desconhecido'} type="error" onClose={() => setErrorToast(null)} />
+        <div className="flex h-screen items-center justify-center p-4">
+          <div
+            className="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg shadow-md"
+            role="alert"
+          >
+            <strong className="font-bold">Erro: </strong>
+            <span className="block sm:inline">{error instanceof Error ? error.message : 'Erro desconhecido'}</span>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -386,6 +387,9 @@ export default function PdvPage() {
         )}
       </div>
 
+      {errorToast && (
+        <Toast message={errorToast} type="error" onClose={() => setErrorToast(null)} />
+      )}
       {selectedComanda && (
         <PaymentModal
           isOpen={isPaymentModalOpen}

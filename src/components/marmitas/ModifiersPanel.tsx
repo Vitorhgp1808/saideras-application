@@ -3,6 +3,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import ModifierGroupForm from "@/components/modifiers/ModifierGroupForm";
 import ModifierItemForm from "@/components/modifiers/ModifierItemForm";
 import Modal from "@/components/ui/Modal";
+import { Toast } from "@/components/ui/Toast";
 
 interface ModifiersPanelProps {
   marmitaId: string;
@@ -16,6 +17,13 @@ export default function ModifiersPanel({ marmitaId }: ModifiersPanelProps) {
   const [showItemFormGroupId, setShowItemFormGroupId] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<ModifierItem | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimeout = useRef<NodeJS.Timeout | null>(null);
+  function showToast(msg: string) {
+    setToastMsg(msg);
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setToastMsg(null), 4000);
+  }
 
   useEffect(() => {
     if (marmitaId) fetchGroups(marmitaId);
@@ -23,33 +31,39 @@ export default function ModifiersPanel({ marmitaId }: ModifiersPanelProps) {
 
   async function fetchGroups(marmitaId: string) {
     setLoading(true);
-    const token = localStorage.getItem("authToken");
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    const res = await fetch(`/api/marmitas/${marmitaId}/modifiers`, { headers });
-    const data = await res.json();
-    setGroups(data as ModifierGroup[]);
+    try {
+      const token = localStorage.getItem("authToken");
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`/api/marmitas/${marmitaId}/modifiers`, { headers });
+      if (!res.ok) throw new Error("Erro ao buscar grupos de modificadores");
+      const data = await res.json();
+      setGroups(data as ModifierGroup[]);
+    } catch (err: any) {
+      showToast(err?.message || "Erro ao buscar grupos de modificadores.");
+    }
     setLoading(false);
   }
 
   async function handleAddGroup(data: { name: string; minSelections: number; maxSelections: number; order: number }) {
     setLoading(true);
-    const token = localStorage.getItem("authToken");
-    const headers: HeadersInit = {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-    const res = await fetch(`/api/marmitas/${marmitaId}/modifiers`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(data),
-    });
-    if (res.ok) {
+    try {
+      const token = localStorage.getItem("authToken");
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      const res = await fetch(`/api/marmitas/${marmitaId}/modifiers`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Erro ao criar grupo de modificador");
       await fetchGroups(marmitaId);
       setShowGroupForm(false);
       setEditingGroup(null);
       setMessage({ type: 'success', text: 'Grupo criado com sucesso!' });
-    } else {
-      setMessage({ type: 'error', text: 'Erro ao criar grupo de modificador' });
+    } catch (err: any) {
+      showToast(err?.message || "Erro ao criar grupo de modificador.");
     }
     setLoading(false);
   }
@@ -57,23 +71,24 @@ export default function ModifiersPanel({ marmitaId }: ModifiersPanelProps) {
   async function handleEditGroup(data: { name: string; minSelections: number; maxSelections: number; order: number }) {
     if (!editingGroup) return;
     setLoading(true);
-    const token = localStorage.getItem("authToken");
-    const headers: HeadersInit = {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-    const res = await fetch(`/api/marmitas/${marmitaId}/modifiers/${editingGroup.id}`, {
-      method: "PUT",
-      headers,
-      body: JSON.stringify(data),
-    });
-    if (res.ok) {
+    try {
+      const token = localStorage.getItem("authToken");
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      const res = await fetch(`/api/marmitas/${marmitaId}/modifiers/${editingGroup.id}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Erro ao editar grupo de modificador");
       await fetchGroups(marmitaId);
       setShowGroupForm(false);
       setEditingGroup(null);
       setMessage({ type: 'success', text: 'Grupo editado com sucesso!' });
-    } else {
-      setMessage({ type: 'error', text: 'Erro ao editar grupo de modificador' });
+    } catch (err: any) {
+      showToast(err?.message || "Erro ao editar grupo de modificador.");
     }
     setLoading(false);
   }
@@ -81,63 +96,66 @@ export default function ModifiersPanel({ marmitaId }: ModifiersPanelProps) {
   async function handleDeleteGroup(groupId: string) {
     if (!window.confirm("Tem certeza que deseja excluir este grupo? Esta ação não pode ser desfeita.")) return;
     setLoading(true);
-    const token = localStorage.getItem("authToken");
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    const res = await fetch(`/api/marmitas/${marmitaId}/modifiers/${groupId}`, {
-      method: "DELETE",
-      headers,
-    });
-    if (res.ok) {
+    try {
+      const token = localStorage.getItem("authToken");
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`/api/marmitas/${marmitaId}/modifiers/${groupId}`, {
+        method: "DELETE",
+        headers,
+      });
+      if (!res.ok) throw new Error("Erro ao excluir grupo de modificador");
       await fetchGroups(marmitaId);
       setMessage({ type: 'success', text: 'Grupo excluído com sucesso!' });
-    } else {
-      setMessage({ type: 'error', text: 'Erro ao excluir grupo de modificador' });
+    } catch (err: any) {
+      showToast(err?.message || "Erro ao excluir grupo de modificador.");
     }
     setLoading(false);
   }
 
   async function handleAddItem(groupId: string, data: { name: string; priceExtra: number; order: number }) {
     setLoading(true);
-    const token = localStorage.getItem("authToken");
-    const headers: HeadersInit = {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-    const res = await fetch(`/api/modifiers/${groupId}/items`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ ...data, productId: marmitaId }),
-    });
-    if (res.ok) {
+    try {
+      const token = localStorage.getItem("authToken");
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      const res = await fetch(`/api/modifiers/${groupId}/items`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ ...data, productId: marmitaId }),
+      });
+      if (!res.ok) throw new Error("Erro ao criar item de modificador");
       await fetchGroups(marmitaId);
       setShowItemFormGroupId(null);
       setEditingItem(null);
       setMessage({ type: 'success', text: 'Item criado com sucesso!' });
-    } else {
-      setMessage({ type: 'error', text: 'Erro ao criar item de modificador' });
+    } catch (err: any) {
+      showToast(err?.message || "Erro ao criar item de modificador.");
     }
     setLoading(false);
   }
 
   async function handleEditItem(groupId: string, itemId: string, data: { name: string; priceExtra: number; order: number }) {
     setLoading(true);
-    const token = localStorage.getItem("authToken");
-    const headers: HeadersInit = {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-    const res = await fetch(`/api/modifiers/${groupId}/items/${itemId}`, {
-      method: "PUT",
-      headers,
-      body: JSON.stringify(data),
-    });
-    if (res.ok) {
+    try {
+      const token = localStorage.getItem("authToken");
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      };
+      const res = await fetch(`/api/modifiers/${groupId}/items/${itemId}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Erro ao editar item de modificador");
       await fetchGroups(marmitaId);
       setShowItemFormGroupId(null);
       setEditingItem(null);
       setMessage({ type: 'success', text: 'Item editado com sucesso!' });
-    } else {
-      setMessage({ type: 'error', text: 'Erro ao editar item de modificador' });
+    } catch (err: any) {
+      showToast(err?.message || "Erro ao editar item de modificador.");
     }
     setLoading(false);
   }
@@ -145,23 +163,27 @@ export default function ModifiersPanel({ marmitaId }: ModifiersPanelProps) {
   async function handleDeleteItem(groupId: string, itemId: string) {
     if (!window.confirm("Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.")) return;
     setLoading(true);
-    const token = localStorage.getItem("authToken");
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    const res = await fetch(`/api/modifiers/${groupId}/items/${itemId}`, {
-      method: "DELETE",
-      headers,
-    });
-    if (res.ok) {
+    try {
+      const token = localStorage.getItem("authToken");
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`/api/modifiers/${groupId}/items/${itemId}`, {
+        method: "DELETE",
+        headers,
+      });
+      if (!res.ok) throw new Error("Erro ao excluir item de modificador");
       await fetchGroups(marmitaId);
       setMessage({ type: 'success', text: 'Item excluído com sucesso!' });
-    } else {
-      setMessage({ type: 'error', text: 'Erro ao excluir item de modificador' });
+    } catch (err: any) {
+      showToast(err?.message || "Erro ao excluir item de modificador.");
     }
     setLoading(false);
   }
 
   return (
     <div className="mt-6">
+      {toastMsg && (
+        <Toast message={toastMsg} type="error" onClose={() => setToastMsg(null)} />
+      )}
       {message && (
         <div className={`mb-4 px-4 py-2 rounded font-semibold ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
           {message.text}

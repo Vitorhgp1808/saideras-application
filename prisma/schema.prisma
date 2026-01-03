@@ -16,6 +16,7 @@ model User {
   role      UserRole @default(WAITER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
 
   orders          Order[] // Pedidos feitos pelo garçom
   cashierSessions Cashier[] // Turnos de caixa abertos por este usuário
@@ -128,7 +129,7 @@ model Order {
   closedAt  DateTime?
 
   waiterId String
-  waiter   User        @relation(fields: [waiterId], references: [id], onDelete: Cascade)
+  waiter   User        @relation(fields: [waiterId], references: [id], onDelete: Restrict)
   items    OrderItem[]
   payments Payment[]
 
@@ -203,7 +204,7 @@ model Cashier {
 
   // Quem abriu este caixa?
   openedById String
-  openedBy   User   @relation(fields: [openedById], references: [id], onDelete: Cascade)
+  openedBy   User   @relation(fields: [openedById], references: [id], onDelete: Restrict)
 
   // Relação inversa para saber todo o dinheiro que entrou neste turno
   payments Payment[]

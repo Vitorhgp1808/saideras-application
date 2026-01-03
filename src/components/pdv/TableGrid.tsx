@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState, useRef } from "react";
 import { Table, CheckCircle, Plus } from "lucide-react";
 import { Order } from "../../types/pdv";
+import { Toast } from "@/components/ui/Toast";
 
 // Estrutura para representar o slot da comanda no grid
 export type ComandaSlot = {
@@ -33,16 +34,31 @@ export function TableGrid({
   filter,
   setFilter
 }: TableGridProps) {
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimeout = useRef<NodeJS.Timeout | null>(null);
+  function showToast(msg: string) {
+    setToastMsg(msg);
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setToastMsg(null), 4000);
+  }
 
-  const filteredSlots = slots.filter(slot => {
-    if (filter === 'TODAS') return true;
-    if (filter === 'ABERTAS') return slot.status === 'OCUPADA';
-    if (filter === 'LIVRES') return slot.status === 'LIVRE';
-    return true;
-  });
+  let filteredSlots: ComandaSlot[] = [];
+  try {
+    filteredSlots = slots.filter(slot => {
+      if (filter === 'TODAS') return true;
+      if (filter === 'ABERTAS') return slot.status === 'OCUPADA';
+      if (filter === 'LIVRES') return slot.status === 'LIVRE';
+      return true;
+    });
+  } catch (err: any) {
+    showToast(err?.message || 'Erro ao filtrar comandas.');
+  }
 
   return (
     <div className="p-6 flex flex-col h-full">
+      {toastMsg && (
+        <Toast message={toastMsg} type="error" onClose={() => setToastMsg(null)} />
+      )}
       {/* Header com Filtros */}
       <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-6">
         <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">

@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState, useRef } from "react";
 import { X, CreditCard, Banknote, Smartphone } from "lucide-react";
 import { Order } from "../../types/pdv";
 import { Button } from "../../components/ui/Button";
+import { Toast } from "@/components/ui/Toast";
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -27,10 +28,30 @@ export function PaymentModal({
   comanda,
   isLoading,
 }: PaymentModalProps) {
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimeout = useRef<NodeJS.Timeout | null>(null);
+  function showToast(msg: string) {
+    setToastMsg(msg);
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setToastMsg(null), 4000);
+  }
+
   if (!isOpen) return null;
+
+  // Wrappers para capturar erros dos handlers
+  const handleConfirmPayment = async (method: "CASH" | "DEBIT" | "CREDIT" | "PIX") => {
+    try {
+      await onConfirmPayment(method);
+    } catch (err: any) {
+      showToast(err?.message || "Erro ao processar pagamento.");
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm p-2 sm:p-6">
+      {toastMsg && (
+        <Toast message={toastMsg} type="error" onClose={() => setToastMsg(null)} />
+      )}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl w-full max-w-[95vw] sm:max-w-md p-4 sm:p-6 shadow-2xl overflow-y-auto max-h-[95vh]">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
@@ -62,7 +83,7 @@ export function PaymentModal({
 
         <div className="space-y-3">
           <Button
-            onClick={() => onConfirmPayment("CASH")}
+            onClick={() => handleConfirmPayment("CASH")}
             variant="outline"
             className="w-full justify-between h-14 text-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-500 hover:text-emerald-600 dark:hover:text-emerald-400"
             disabled={isLoading}
@@ -73,7 +94,7 @@ export function PaymentModal({
           </Button>
 
           <Button
-            onClick={() => onConfirmPayment("DEBIT")}
+            onClick={() => handleConfirmPayment("DEBIT")}
             variant="outline"
             className="w-full justify-between h-14 text-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400"
             disabled={isLoading}
@@ -84,7 +105,7 @@ export function PaymentModal({
           </Button>
 
           <Button
-            onClick={() => onConfirmPayment("CREDIT")}
+            onClick={() => handleConfirmPayment("CREDIT")}
             variant="outline"
             className="w-full justify-between h-14 text-lg hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-500 hover:text-amber-600 dark:hover:text-amber-400"
             disabled={isLoading}
@@ -95,7 +116,7 @@ export function PaymentModal({
           </Button>
 
           <Button
-            onClick={() => onConfirmPayment("PIX")}
+            onClick={() => handleConfirmPayment("PIX")}
             variant="outline"
             className="w-full justify-between h-14 text-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400"
             disabled={isLoading}

@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { X, Upload, Image as ImageIcon } from "lucide-react";
 import Image from "next/image"; 
 import { Product, ProductCategory } from "../../types/pdv";
 import { Button } from "../../components/ui/Button";
 import { supabase } from "../../lib/supabase";
+import { Toast } from "../../components/ui/Toast";
+
 interface ProductModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -23,6 +25,8 @@ export function ProductModal({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const [formData, setFormData] = useState<Partial<Product>>({
     name: "",
@@ -72,6 +76,12 @@ export function ProductModal({
     }
   };
 
+  function showToast(msg: string) {
+    setToastMsg(msg);
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setToastMsg(null), 4000);
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsUploadingImage(true);
@@ -101,9 +111,9 @@ export function ProductModal({
         imageUrl: finalImageUrl,
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao fazer upload da imagem:", error);
-      alert("Erro ao salvar imagem. Tente novamente.");
+      showToast(error?.message || "Erro ao salvar imagem. Tente novamente.");
     } finally {
       setIsUploadingImage(false);
     }
@@ -112,205 +122,210 @@ export function ProductModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm p-2 sm:p-6">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl w-full max-w-[95vw] sm:max-w-2xl max-h-[95vh] overflow-y-auto p-4 sm:p-6 shadow-2xl">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-            {product ? "Editar Produto" : "Novo Produto"}
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-          >
-            <X size={24} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6"> 
-            
-            <div className="col-span-1 md:col-span-2 flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                <div className="relative w-32 h-32 mb-4 group">
-                  {previewUrl ? (
-                    <div className="relative w-full h-full rounded-full overflow-hidden border-4 border-white dark:border-slate-700 shadow-md">
-
-                        <img 
-                            src={previewUrl} 
-                            alt="Preview" 
-                            className="w-full h-full object-cover"
-                        />
-                    </div>
-                  ) : (
-                    <div className="w-full h-full rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-400">
-                      <ImageIcon size={40} />
-                    </div>
-                  )}
-                  
-                  <label 
-                    htmlFor="image-upload" 
-                    className="absolute bottom-0 right-0 p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-full cursor-pointer shadow-lg transition-transform hover:scale-105"
-                  >
-                    <Upload size={16} />
-                  </label>
-                </div>
-                
-                <input
-                  id="image-upload"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="hidden"
-                />
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Clique no ícone para adicionar uma foto (JPG, PNG)
-                </p>
-            </div>
-
-            <div className="col-span-1 md:col-span-2">
-              <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">
-                Nome do Produto
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500"
-              />
-            </div>
-
-            <div className="col-span-1 md:col-span-2">
-              <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">
-                Descrição
-              </label>
-              <input
-                type="text"
-                value={formData.description || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">
-                Preço Venda (R$)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                required
-                value={formData.sellingPrice}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    sellingPrice: parseFloat(e.target.value),
-                  })
-                }
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">
-                Categoria
-              </label>
-              <select
-                value={formData.category}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    category: e.target.value as ProductCategory,
-                  })
-                }
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500"
-              >
-                <option value="OTHER">Geral</option>
-                <option value="CHOPP">Chopp</option>
-                <option value="DRINK">Bebida</option>
-                <option value="FOOD">Comida</option> 
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">
-                Unidade de Medida
-              </label>
-              <select
-                value={formData.unitOfMeasure}
-                onChange={(e) =>
-                  setFormData({ ...formData, unitOfMeasure: e.target.value })
-                }
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500"
-              >
-                <option value="UN">Unidade (UN)</option>
-                <option value="L">Litro (L)</option>
-                <option value="KG">Quilo (KG)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">
-                Estoque Mínimo
-              </label>
-              <input
-                type="number"
-                step="1"
-                required
-                value={formData.minStockLevel}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    minStockLevel: parseFloat(e.target.value),
-                  })
-                }
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">
-                Estoque Atual
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                required
-                value={formData.stock}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    stock: parseFloat(e.target.value),
-                  })
-                }
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500"
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-3 mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
-            <Button
-              type="button"
-              variant="ghost"
+    <>
+      {toastMsg && (
+        <Toast message={toastMsg} type="error" onClose={() => setToastMsg(null)} />
+      )}
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm p-2 sm:p-6">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl w-full max-w-[95vw] sm:max-w-2xl max-h-[95vh] overflow-y-auto p-4 sm:p-6 shadow-2xl">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+              {product ? "Editar Produto" : "Novo Produto"}
+            </h3>
+            <button
               onClick={onClose}
-              className="flex-1"
-              disabled={isLoading || isUploadingImage}
+              className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
             >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              className="flex-1"
-              isLoading={isLoading || isUploadingImage}
-            >
-              {isUploadingImage ? "Enviando Imagem..." : (product ? "Salvar Alterações" : "Cadastrar Produto")}
-            </Button>
+              <X size={24} />
+            </button>
           </div>
-        </form>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6"> 
+              
+              <div className="col-span-1 md:col-span-2 flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+                  <div className="relative w-32 h-32 mb-4 group">
+                    {previewUrl ? (
+                      <div className="relative w-full h-full rounded-full overflow-hidden border-4 border-white dark:border-slate-700 shadow-md">
+
+                          <img 
+                              src={previewUrl} 
+                              alt="Preview" 
+                              className="w-full h-full object-cover"
+                          />
+                      </div>
+                    ) : (
+                      <div className="w-full h-full rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-400">
+                        <ImageIcon size={40} />
+                      </div>
+                    )}
+                    
+                    <label 
+                      htmlFor="image-upload" 
+                      className="absolute bottom-0 right-0 p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-full cursor-pointer shadow-lg transition-transform hover:scale-105"
+                    >
+                      <Upload size={16} />
+                    </label>
+                  </div>
+                  
+                  <input
+                    id="image-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Clique no ícone para adicionar uma foto (JPG, PNG)
+                  </p>
+              </div>
+
+              <div className="col-span-1 md:col-span-2">
+                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">
+                  Nome do Produto
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="col-span-1 md:col-span-2">
+                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">
+                  Descrição
+                </label>
+                <input
+                  type="text"
+                  value={formData.description || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">
+                  Preço Venda (R$)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={formData.sellingPrice}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      sellingPrice: parseFloat(e.target.value),
+                    })
+                  }
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">
+                  Categoria
+                </label>
+                <select
+                  value={formData.category}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      category: e.target.value as ProductCategory,
+                    })
+                  }
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500"
+                >
+                  <option value="OTHER">Geral</option>
+                  <option value="CHOPP">Chopp</option>
+                  <option value="DRINK">Bebida</option>
+                  <option value="FOOD">Comida</option> 
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">
+                  Unidade de Medida
+                </label>
+                <select
+                  value={formData.unitOfMeasure}
+                  onChange={(e) =>
+                    setFormData({ ...formData, unitOfMeasure: e.target.value })
+                  }
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500"
+                >
+                  <option value="UN">Unidade (UN)</option>
+                  <option value="L">Litro (L)</option>
+                  <option value="KG">Quilo (KG)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">
+                  Estoque Mínimo
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  required
+                  value={formData.minStockLevel}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      minStockLevel: parseFloat(e.target.value),
+                    })
+                  }
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">
+                  Estoque Atual
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={formData.stock}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      stock: parseFloat(e.target.value),
+                    })
+                  }
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={onClose}
+                className="flex-1"
+                disabled={isLoading || isUploadingImage}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                className="flex-1"
+                isLoading={isLoading || isUploadingImage}
+              >
+                {isUploadingImage ? "Enviando Imagem..." : (product ? "Salvar Alterações" : "Cadastrar Produto")}
+              </Button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

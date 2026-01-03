@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Modal from '@/components/ui/Modal';
 import { PaymentModal } from '@/components/pdv/PaymentModal';
 import { Order } from '@/types/pdv';
+import { Toast } from '@/components/ui/Toast';
 
 export default function MarmitasCozinhaPage() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -24,34 +25,72 @@ export default function MarmitasCozinhaPage() {
 
   // Estado para nome do pedido
   const [pedidoNome, setPedidoNome] = useState("");
-  
+  // Estado para erro global (toast)
+  const [errorToast, setErrorToast] = useState<string | null>(null);
+  const toastTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // Função para exibir toast de erro
+  function showErrorToast(msg: string) {
+    setErrorToast(msg);
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setErrorToast(null), 4000);
+  }
+
   // --- FIX 1: Ensure this state is used correctly below ---
   const [observacaoMarmita, setObservacaoMarmita] = useState(""); 
 
   async function fetchMarmitasDisponiveis() {
-    const token = localStorage.getItem('authToken');
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    const res = await fetch('/api/marmitas', { headers });
-    const data = await res.json();
-    setMarmitasDisponiveis(Array.isArray(data) ? data.filter((m) => m.active !== false) : []);
+    try {
+      const token = localStorage.getItem('authToken');
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch('/api/marmitas', { headers });
+      if (!res.ok) {
+        const err = await res.json();
+        showErrorToast(err.error || err.message || 'Erro ao buscar marmitas disponíveis.');
+        return;
+      }
+      const data = await res.json();
+      setMarmitasDisponiveis(Array.isArray(data) ? data.filter((m) => m.active !== false) : []);
+    } catch (error) {
+      showErrorToast('Erro ao buscar marmitas disponíveis.');
+    }
   }
 
   async function fetchModifierGroups(productId: string) {
     if (!productId) return;
-    const token = localStorage.getItem('authToken');
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    const res = await fetch(`/api/marmitas/${productId}/modifiers`, { headers });
-    const data = await res.json();
-    setModifierGroups(data);
+    try {
+      const token = localStorage.getItem('authToken');
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`/api/marmitas/${productId}/modifiers`, { headers });
+      if (!res.ok) {
+        const err = await res.json();
+        showErrorToast(err.error || err.message || 'Erro ao buscar modificadores.');
+        return;
+      }
+      const data = await res.json();
+      setModifierGroups(data);
+    } catch (error) {
+      showErrorToast('Erro ao buscar modificadores.');
+    }
   }
 
   async function fetchMarmitasPedidos() {
     setLoadingPedidos(true);
-    const token = localStorage.getItem('authToken');
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    const res = await fetch('/api/cozinha/marmitas', { headers });
-    const data = await res.json();
-    setMarmitasPedidos(data);
+    try {
+      const token = localStorage.getItem('authToken');
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch('/api/cozinha/marmitas', { headers });
+      if (!res.ok) {
+        const err = await res.json();
+        showErrorToast(err.error || err.message || 'Erro ao buscar pedidos de marmita.');
+        setLoadingPedidos(false);
+        return;
+      }
+      const data = await res.json();
+      setMarmitasPedidos(data);
+    } catch (error) {
+      showErrorToast('Erro ao buscar pedidos de marmita.');
+    }
     setLoadingPedidos(false);
   }
 
@@ -86,19 +125,29 @@ export default function MarmitasCozinhaPage() {
   }, [selectedMarmitaId, selectedModifiers, modifierGroups, marmitasDisponiveis]);
 
   async function handleBaixar(id: string) {
-    const token = localStorage.getItem('authToken');
-    const headers: HeadersInit = token ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } : { 'Content-Type': 'application/json' };
-    await fetch(`/api/cozinha/marmitas/${id}/baixar`, { method: 'POST', headers });
-    fetchMarmitasPedidos();
+    try {
+      const token = localStorage.getItem('authToken');
+      const headers: HeadersInit = token ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } : { 'Content-Type': 'application/json' };
+      const res = await fetch(`/api/cozinha/marmitas/${id}/baixar`, { method: 'POST', headers });
+      if (!res.ok) {
+        const err = await res.json();
+        showErrorToast(err.error || err.message || 'Erro ao baixar pedido.');
+        return;
+      }
+      fetchMarmitasPedidos();
+    } catch (error) {
+      showErrorToast('Erro ao baixar pedido.');
+    }
   }
 
   async function handleCriarPedido() {
+    setErrorToast(null);
     if (!pedidoNome.trim()) {
-      alert("Por favor, informe o nome de quem está pedindo.");
+      showErrorToast("Por favor, informe o nome de quem está pedindo.");
       return;
     }
     if (marmitasPedido.length === 0) {
-      alert("Adicione ao menos uma marmita ao pedido.");
+      showErrorToast("Adicione ao menos uma marmita ao pedido.");
       return;
     }
     const totalPedido = marmitasPedido.reduce((acc, m) => acc + (m.unitPrice * m.quantity), 0);
@@ -109,7 +158,7 @@ export default function MarmitasCozinhaPage() {
       try {
         const token = localStorage.getItem('authToken');
         const headers: HeadersInit = token ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } : { 'Content-Type': 'application/json' };
-        await fetch('/api/cozinha/marmitas/pedido', {
+        const res = await fetch('/api/cozinha/marmitas/pedido', {
           method: 'POST',
           headers,
           body: JSON.stringify({
@@ -118,6 +167,11 @@ export default function MarmitasCozinhaPage() {
             nome: pedidoNome,
           }),
         });
+        if (!res.ok) {
+          const err = await res.json();
+          showErrorToast(err.error || err.message || 'Erro ao criar pedido.');
+          return;
+        }
         setIsPaymentModalOpen(false);
         setSelectedMarmitaId(null);
         setModifierGroups([]);
@@ -126,16 +180,18 @@ export default function MarmitasCozinhaPage() {
         setObservacaoMarmita("");
         setMarmitasPedido([]);
         fetchMarmitasPedidos();
-        alert('Pedido de marmita criado!');
+        setErrorToast(null);
       } catch (error) {
-        console.error(error);
-        alert('Erro ao criar pedido.');
+        showErrorToast('Erro ao criar pedido.');
       }
     });
   }
 
   return (
     <div className="p-6">
+      {errorToast && (
+        <Toast message={errorToast} type="error" onClose={() => setErrorToast(null)} />
+      )}
       {/* Modal de Escolha da Marmita */}
       {showPedidoForm && (
         <Modal 
@@ -323,7 +379,7 @@ export default function MarmitasCozinhaPage() {
         <div className="flex justify-between items-center mb-6">
             <div>
                 <h1 className="text-2xl font-bold mb-2 text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <span role="img" aria-label="marmita">🍱</span> Marmitas Pedidas
+                <span role="img" aria-label="marmita">🍱</span> Delivery
                 </h1>
                 <p className="text-gray-600 dark:text-slate-400">Acompanhe aqui as marmitas pedidas e monte conforme as escolhas.</p>
             </div>

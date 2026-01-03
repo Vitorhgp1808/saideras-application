@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Trash2, DollarSign, User, Plus, Table as TableIcon } from 'lucide-react';
 import { Order, Product } from "../../types/pdv";
 import { Button } from '../ui/Button';
+import { Toast } from "@/components/ui/Toast";
 
 interface OrderPanelProps {
   comanda: Order | null;
@@ -39,7 +40,9 @@ export function OrderPanel({
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [showAddProduct, setShowAddProduct] = useState(true);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const toastTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Extrai categorias únicas dos produtos
   const categories = useMemo(() => {
@@ -66,14 +69,24 @@ export function OrderPanel({
     setQuantity(1);
   }, [comanda?.id]);
 
+  function showToast(msg: string) {
+    setToastMsg(msg);
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setToastMsg(null), 4000);
+  }
+
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedProduct && quantity > 0) {
-      onAddItem(selectedProduct, quantity);
-      setSelectedProduct("");
-      setQuantity(1);
-      setSearch("");
-      if (searchInputRef.current) searchInputRef.current.focus();
+      try {
+        onAddItem(selectedProduct, quantity);
+        setSelectedProduct("");
+        setQuantity(1);
+        setSearch("");
+        if (searchInputRef.current) searchInputRef.current.focus();
+      } catch (err: any) {
+        showToast(err?.message || "Erro ao adicionar item.");
+      }
     }
   };
 
@@ -335,6 +348,9 @@ export function OrderPanel({
           </Button>
         </div>
       </div>
+      {toastMsg && (
+        <Toast message={toastMsg} type="error" onClose={() => setToastMsg(null)} />
+      )}
     </div>
   );
 }

@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
     await getAuthManager(request);
 
     const users = await prisma.user.findMany({
+      where: { deletedAt: null },
       select: {
         id: true,
         name: true,

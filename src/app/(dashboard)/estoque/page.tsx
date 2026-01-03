@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { Toast } from '../../../components/ui/Toast';
 import { Product } from "../../../types/pdv";
 import { ProductList } from "../../../components/inventory/ProductList";
 import { ProductModal } from "../../../components/inventory/ProductModal";
@@ -48,58 +49,61 @@ export default function EstoquePage() {
   };
 
   // --- NOVA FUNÇÃO: Atualiza o status Ativo/Inativo ---
-  const handleToggleActive = async (product: Product, active: boolean) => {
+    // Toast de erro
+    const [errorToast, setErrorToast] = useState<string | null>(null);
+    const toastTimeout = useRef<NodeJS.Timeout | null>(null);
+    function showErrorToast(msg: string) {
+    setErrorToast(msg);
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setErrorToast(null), 4000);
+    }
+
+    const handleToggleActive = async (product: Product, active: boolean) => {
     const headers = getAuthHeaders();
     if (!headers) return;
-
-    // 1. Atualização Otimista (Muda na tela instantaneamente antes do servidor)
     mutate('/api/products', (currentProducts: Product[] | undefined) => {
-        if (!currentProducts) return [];
-        return currentProducts.map(p => 
-            p.id === product.id ? { ...p, active } : p
-        );
-    }, false); // "false" impede o revalidation imediato para não piscar
-
+      if (!currentProducts) return [];
+      return currentProducts.map(p => 
+        p.id === product.id ? { ...p, active } : p
+      );
+    }, false);
     try {
-        // 2. Envia para a API
-        // Nota: Assumi que sua API aceita PATCH. Se não aceitar, mude para PUT e envie o objeto todo.
-        const res = await fetch(`/api/products/${product.id}`, {
-            method: 'PATCH', 
-            headers,
-            body: JSON.stringify({ active })
-        });
-
-        if (!res.ok) throw new Error("Erro ao atualizar status");
-
-        // 3. Confirma os dados reais do servidor
+      const res = await fetch(`/api/products/${product.id}`, {
+        method: 'PATCH', 
+        headers,
+        body: JSON.stringify({ active })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        showErrorToast(err.error || err.message || "Não foi possível atualizar o status.");
         mutate('/api/products');
+        return;
+      }
+      mutate('/api/products');
     } catch (error) {
-        console.error(error);
-        alert("Não foi possível atualizar o status.");
-        // Reverte a mudança visual em caso de erro
-        mutate('/api/products'); 
+      showErrorToast("Não foi possível atualizar o status.");
+      mutate('/api/products');
     }
-  };
+    };
   // ----------------------------------------------------
 
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este produto?")) return;
-
     try {
       const headers = getAuthHeaders();
       if (!headers) return;
-
       const res = await fetch(`/api/products/${id}`, {
         method: 'DELETE',
         headers
       });
-
-      if (!res.ok) throw new Error("Falha ao excluir produto");
-      
+      if (!res.ok) {
+        const err = await res.json();
+        showErrorToast(err.error || err.message || "Falha ao excluir produto");
+        return;
+      }
       mutate('/api/products');
     } catch (err) {
-      if (err instanceof Error) alert(err.message);
-      else alert("Erro desconhecido");
+      showErrorToast(err instanceof Error ? err.message : "Erro desconhecido");
     }
   };
 
@@ -108,23 +112,22 @@ export default function EstoquePage() {
     try {
       const headers = getAuthHeaders();
       if (!headers) return;
-
       const method = editingProduct ? 'PUT' : 'POST';
       const url = editingProduct ? `/api/products/${editingProduct.id}` : '/api/products';
-
       const res = await fetch(url, {
         method,
         headers,
         body: JSON.stringify(productData)
       });
-
-      if (!res.ok) throw new Error("Falha ao salvar produto");
-
+      if (!res.ok) {
+        const err = await res.json();
+        showErrorToast(err.error || err.message || "Falha ao salvar produto");
+        return;
+      }
       mutate('/api/products');
       setIsModalOpen(false);
     } catch (err) {
-      if (err instanceof Error) alert(err.message);
-      else alert("Erro desconhecido");
+      showErrorToast(err instanceof Error ? err.message : "Erro desconhecido");
     } finally {
       setIsSaving(false);
     }
@@ -139,11 +142,19 @@ export default function EstoquePage() {
   }
 
   if (error) {
-    return <ErrorDisplay message={error instanceof Error ? error.message : 'Erro ao carregar produtos'} />;
+    return (
+      <>
+        <Toast message={error instanceof Error ? error.message : 'Erro ao carregar produtos'} type="error" onClose={() => setErrorToast(null)} />
+        <ErrorDisplay message={error instanceof Error ? error.message : 'Erro ao carregar produtos'} />
+      </>
+    );
   }
 
   return (
     <div className="p-6 md:p-8 animate-fade-in">
+      {errorToast && (
+        <Toast message={errorToast} type="error" onClose={() => setErrorToast(null)} />
+      )}
       <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
           Gestão de Estoque

@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState, useCallback } from "react"; // Mantenha apenas esta linha
+import { useRef } from "react";
 import useSWR from "swr";
 import { jwtDecode } from "jwt-decode";
 // Combinei seus ícones do lucide-react em um único import para ficar mais limpo
@@ -21,6 +22,7 @@ import {
   Receipt
 } from "lucide-react";
 import { useTheme } from "./ThemeProvider";
+import { Toast } from './ui/Toast';
 import { fetcher } from "../lib/fetcher";
 import { CustomError } from "../types/error";
 
@@ -58,7 +60,7 @@ const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: <Gauge size={20} />, roles: ['ADMIN'] },
   { href: "/pdv", label: "Comandas", icon: <Receipt size={20} />, roles: ['WAITER', 'CASHIER', 'ADMIN'] },
   { href: "/cozinha/marmitas", label: "Cozinha", icon: <ChefHat size={20} />, roles: ['ADMIN', 'CASHIER', 'WAITER'] },
-  { href: "/marmitas", label: "Marmitas", icon: <Utensils size={20} />, roles: ['ADMIN', 'CASHIER', 'WAITER'] },
+  { href: "/marmitas", label: "Delivery", icon: <Utensils size={20} />, roles: ['ADMIN', 'CASHIER', 'WAITER'] },
   { href: "/estoque", label: "Estoque", icon: <Boxes size={20} />, roles: ['ADMIN'] },
   { href: "/compras", label: "Compras", icon: <ShoppingCart size={20} />, roles: ['ADMIN'] },
   { href: "/relatorios", label: "Relatórios", icon: <BarChart3 size={20} />, roles: ['ADMIN'] },
@@ -72,6 +74,15 @@ type SidebarProps = {
 export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   // Detecta se está em mobile
   const [isMobile, setIsMobile] = useState(false);
+  // Toast de erro
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimeout = useRef<NodeJS.Timeout | null>(null);
+  function showToast(msg: string) {
+    setToastMsg(msg);
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setToastMsg(null), 4000);
+  }
+
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
@@ -137,10 +148,10 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
         // Só faz logout se o erro for 401 (Unauthorized), 403 (Forbidden) ou 404 (Not Found)
         const errorStatus = userSessionError.status;
         if ([401, 403, 404].includes(errorStatus as number)) {
-          console.error("Erro na sessão do usuário, efetuando logout:", userSessionError);
+          showToast("Erro na sessão do usuário, efetuando logout: " + (userSessionError.message || userSessionError.status));
           handleLogout();
         } else {
-          console.warn("Erro na sessão do usuário, mas não efetuando logout (status diferente de 401/403/404):", userSessionError);
+          showToast("Erro na sessão do usuário, mas não efetuando logout (status diferente de 401/403/404): " + (userSessionError.message || userSessionError.status));
         }
         return;
       }
@@ -175,7 +186,7 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
 
     } catch (error) {
       // Erro ao decodificar o token
-      console.error("Erro ao decodificar token:", error);
+      showToast("Erro ao decodificar token");
       handleLogout();
     }
   }, [router, pathname, authToken, userData, userSessionError, isReady, handleLogout]);
@@ -207,7 +218,11 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
   if (!currentRole) return null; // Não renderiza a sidebar se não houver role (não autenticado)
 
   return (
-    <aside className={sidebarClasses}>
+    <>
+      {toastMsg && (
+        <Toast message={toastMsg} type="error" onClose={() => setToastMsg(null)} />
+      )}
+      <aside className={sidebarClasses}>
       {/* Botão de minimizar/expandir só aparece se não for mobile */}
       {!isMobile && (
         <button
@@ -303,5 +318,6 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
         </button>
       </div>
     </aside>
+    </>
   );
 }

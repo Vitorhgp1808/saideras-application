@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Search, Beer, Utensils, Wine, Box, ShoppingBag } from 'lucide-react';
+import { Toast } from '@/components/ui/Toast';
 
 type SerializedProduct = {
   id: string;
@@ -11,6 +12,7 @@ type SerializedProduct = {
   category: 'CHOPP' | 'FOOD' | 'DRINK' | 'OTHER';
   unitOfMeasure: string;
   stock: number;
+  active: boolean;
   imageUrl?: string | null;
 };
 
@@ -26,15 +28,28 @@ const CATEGORIES = [
 export default function MenuBoard({ products }: { products: SerializedProduct[] }) {
   const [activeCategory, setActiveCategory] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
-  // Only show products that are active (for marmitas and all products)
-  const filteredProducts = products
-    .filter((product) => (product.active !== false))
-    .filter((product) => {
-      const matchesCategory = activeCategory === 'ALL' || product.category === activeCategory;
-      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        product.description?.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesCategory && matchesSearch;
-    });
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimeout = useRef<NodeJS.Timeout | null>(null);
+  function showToast(msg: string) {
+    setToastMsg(msg);
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setToastMsg(null), 4000);
+  }
+
+ 
+  let filteredProducts: SerializedProduct[] = [];
+  try {
+    filteredProducts = products
+      .filter((product) => (product.active !== false)) 
+      .filter((product) => {
+        const matchesCategory = activeCategory === 'ALL' || product.category === activeCategory;
+        const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+          product.description?.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchesCategory && matchesSearch;
+      });
+  } catch (err: any) {
+    showToast(err?.message || 'Erro ao filtrar produtos.');
+  }
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -45,6 +60,9 @@ export default function MenuBoard({ products }: { products: SerializedProduct[] 
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
+      {toastMsg && (
+        <Toast message={toastMsg} type="error" onClose={() => setToastMsg(null)} />
+      )}
       <div className="sticky top-0 z-10 bg-white shadow-sm pt-4 pb-2 px-2 sm:px-4">
         <h1 className="text-2xl font-bold text-gray-800 mb-4">Nosso Cardápio</h1>
         
