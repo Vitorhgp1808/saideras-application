@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from '@/lib/prisma';
 import { getAuth } from '@/app/api/api/authUtils';
+import { NextRequest } from "next/server";
 
 // Define o tipo para Next.js 15
 type RouteContext = {
@@ -8,7 +9,7 @@ type RouteContext = {
 };
 
 // PUT: Edita um grupo de modificador
-export async function PUT(req: Request, context: RouteContext) {
+export async function PUT(req: NextRequest, context: RouteContext) {
   // 1. AWAIT OBRIGATÓRIO NO NEXT.JS 15
   const params = await context.params;
   const { id, groupId } = params;
@@ -46,7 +47,7 @@ export async function PUT(req: Request, context: RouteContext) {
 }
 
 // DELETE: Remove um grupo de modificador
-export async function DELETE(req: Request, context: RouteContext) {
+export async function DELETE(req: NextRequest, context: RouteContext) {
   // 1. AWAIT OBRIGATÓRIO NO NEXT.JS 15
   const params = await context.params;
   const { id, groupId } = params;

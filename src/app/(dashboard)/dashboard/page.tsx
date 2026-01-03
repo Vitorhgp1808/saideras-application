@@ -189,7 +189,8 @@ export default function DashboardPage() {
                       borderRadius: '8px'
                     }}
                     itemStyle={{ color: '#f59e0b' }}
-                    formatter={(value: number) => [formatCurrency(value), 'Vendas']}
+                    // Fix: Accept 'number | undefined' and fallback to 0
+                    formatter={(value: number | undefined) => [formatCurrency(value || 0), 'Vendas']}
                   />
                   <Bar dataKey="vendas" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={40} />
                 </BarChart>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from '@/lib/prisma';
 import { getAuth } from '@/app/api/api/authUtils';
+import { NextRequest } from "next/server";
 
 // Definição do tipo para Next.js 15
 type RouteContext = {
@@ -8,7 +9,7 @@ type RouteContext = {
 };
 
 // GET: Lista todos os itens de um grupo de modificador
-export async function GET(_req: Request, context: RouteContext) {
+export async function GET(_req: NextRequest, context: RouteContext) {
   // 1. AWAIT OBRIGATÓRIO
   const params = await context.params;
   
@@ -21,7 +22,7 @@ export async function GET(_req: Request, context: RouteContext) {
 }
 
 // POST: Cria um novo item de modificador em um grupo
-export async function POST(req: Request, context: RouteContext) {
+export async function POST(req: NextRequest, context: RouteContext) {
   // 1. AWAIT OBRIGATÓRIO PARA LER O ID DO GRUPO
   const params = await context.params;
   const groupId = params.id;

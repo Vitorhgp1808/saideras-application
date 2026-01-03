@@ -402,7 +402,7 @@ export default function RelatoriosPage() {
                     color: '#f1f5f9' 
                   }}
                   itemStyle={{ color: '#f59e0b' }}
-                  formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Faturamento']}
+                  formatter={(value: number | undefined) => [`R$ ${value?.toFixed(2) || '0.00'}`, 'Faturamento']}
                 />
                 <Area type="monotone" dataKey="value" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
               </AreaChart>
@@ -438,7 +438,7 @@ export default function RelatoriosPage() {
                     borderColor: '#334155', 
                     color: '#f1f5f9' 
                   }}
-                  formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Total']}
+                  formatter={(value: number | undefined) => [`R$ ${value?.toFixed(2) || '0.00'}`, 'Total']}
                 />
                 <Legend verticalAlign="bottom" height={36} iconType="circle" />
               </PieChart>

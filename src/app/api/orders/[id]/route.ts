@@ -41,13 +41,6 @@ export async function POST(
         items: {
           include: {
             product: true,
-            orderItemModifiers: {
-              include: {
-                modifierItem: {
-                  include: { product: true },
-                },
-              },
-            },
           },
         },
       },
@@ -57,30 +50,6 @@ export async function POST(
     }
     if (order.status !== 'OPEN') {
       return NextResponse.json({ error: 'Pedido já fechado ou cancelado.' }, { status: 400 });
-    }
-    // Baixa de estoque dos ingredientes das marmitas
-    for (const item of order.items) {
-      // Verifica se é marmita (produto composto)
-      const recipes = await prisma.productRecipe.findMany({
-        where: { productId: item.productId },
-      });
-      for (const recipe of recipes) {
-        // Soma quantidade total a ser baixada
-        const totalQty = recipe.quantity * item.quantity;
-        await prisma.product.update({
-          where: { id: recipe.ingredientId },
-          data: { stock: { decrement: totalQty } },
-        });
-      }
-      // Para cada modificador que seja produto, baixa estoque
-      for (const mod of item.orderItemModifiers) {
-        if (mod.modifierItem.product) {
-          await prisma.product.update({
-            where: { id: mod.modifierItem.product.id },
-            data: { stock: { decrement: item.quantity } },
-          });
-        }
-      }
     }
     // Atualiza status do pedido para CLOSED
     await prisma.order.update({
@@ -152,13 +121,6 @@ export async function DELETE(
         items: {
           include: {
             product: true,
-            orderItemModifiers: {
-              include: {
-                modifierItem: {
-                  include: { product: true },
-                },
-              },
-            },
           },
         },
       },
@@ -171,42 +133,6 @@ export async function DELETE(
     if (order.status !== 'OPEN') {
       return NextResponse.json({ error: 'Apenas comandas abertas podem ser canceladas.' }, { status: 400 });
     }
-
-    // Reverte baixa de estoque dos ingredientes das marmitas
-    for (const item of order.items) {
-      // Verifica se é marmita (produto composto)
-      const recipes = await prisma.productRecipe.findMany({
-        where: { productId: item.productId },
-      });
-      for (const recipe of recipes) {
-        // Soma quantidade total a ser revertida
-        const totalQty = recipe.quantity * item.quantity;
-        await prisma.product.update({
-          where: { id: recipe.ingredientId },
-          data: { stock: { increment: totalQty } },
-        });
-      }
-      // Para cada modificador que seja produto, reverte estoque
-      for (const mod of item.orderItemModifiers) {
-        if (mod.modifierItem.product) {
-          await prisma.product.update({
-            where: { id: mod.modifierItem.product.id },
-            data: { stock: { increment: item.quantity } },
-          });
-        }
-      }
-    }
-
-    // Excluir itens/modificadores
-    await prisma.orderItemModifier.deleteMany({
-      where: { orderItemId: { in: order.items.map(i => i.id) } }
-    });
-    await prisma.orderItem.deleteMany({
-      where: { orderId: id }
-    });
-    await prisma.order.delete({
-      where: { id }
-    });
 
     return NextResponse.json({ message: 'Order cancelled successfully, estoque revertido.' });
   } catch (error) {
@@ -259,16 +185,6 @@ export async function GET(
         items: {
           include: {
             product: true,
-            orderItemModifiers: {
-              include: {
-                modifierItem: {
-                  include: {
-                    modifierGroup: true,
-                    product: true,
-                  },
-                },
-              },
-            },
           },
         },
         waiter: true,
@@ -279,19 +195,7 @@ export async function GET(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
-    // Formata resposta detalhada para marmitas
-    const formattedOrder = {
-      ...order,
-      items: order.items.map(item => ({
-        ...item,
-        modifiers: item.orderItemModifiers?.map(mod => ({
-          group: mod.modifierItem.modifierGroup.name,
-          choice: mod.modifierItem.product?.name || mod.modifierItem.name
-        })) || []
-      }))
-    };
-
-    return NextResponse.json(formattedOrder);
+    return NextResponse.json(order);
   } catch (error) {
     console.error(`Error fetching order ${id}:`, error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

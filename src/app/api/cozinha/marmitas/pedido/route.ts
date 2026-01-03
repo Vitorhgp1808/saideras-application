@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server"; // 1. Import NextRequest
 import { prisma } from "@/lib/prisma";
 import { getAuth } from "@/app/api/api/authUtils";
 
@@ -7,7 +7,8 @@ import { getAuth } from "@/app/api/api/authUtils";
  * Cria um novo pedido de marmita (sem mesa)
  * Body: { marmitaId: string, quantity?: number, unitPrice?: number }
  */
-export async function POST(req: Request) {
+// 2. Update the type here from Request to NextRequest
+export async function POST(req: NextRequest) {
   const auth = await getAuth(req);
   if (auth.error) return auth.error;
   if (!auth.user)

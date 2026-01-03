@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { prisma } from '@/lib/prisma';
 import { getAuth } from '@/app/api/api/authUtils';
 
@@ -8,7 +8,7 @@ type RouteContext = {
 };
 
 // GET: Lista todos os grupos
-export async function GET(req: Request, context: RouteContext) {
+export async function GET(req: NextRequest, context: RouteContext) {
   // AWAIT OBRIGATÓRIO NO NEXT.JS 15
   const params = await context.params;
   const id = params.id;
@@ -27,7 +27,7 @@ export async function GET(req: Request, context: RouteContext) {
 }
 
 // POST: Cria um novo grupo
-export async function POST(req: Request, context: RouteContext) {
+export async function POST(req: NextRequest, context: RouteContext) {
   // 1. AWAIT OBRIGATÓRIO NO NEXT.JS 15 PARA LER O ID
   const params = await context.params;
   const id = params.id;

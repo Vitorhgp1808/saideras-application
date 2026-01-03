@@ -1,3 +1,5 @@
+import { ProductCategory } from "@prisma/client";
+
 export async function PATCH(request: NextRequest, { params }: Params) {
   const userRole = request.headers.get("X-User-Role");
   if (userRole !== "ADMIN") {
@@ -17,7 +19,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       sellingPrice?: Prisma.Decimal;
       unitOfMeasure?: string;
       minStockLevel?: number;
-      category?: string;
+      category?: ProductCategory;
       imageUrl?: string;
       active?: boolean;
     };

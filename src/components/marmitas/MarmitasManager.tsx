@@ -4,33 +4,44 @@ import { Toast } from "@/components/ui/Toast";
 import { Marmita, MarmitaFormValues } from "@/types/marmitas";
 import { MarmitasList } from "./MarmitasList";
 import { MarmitaForm } from "./MarmitaForm";
-import ModifiersPanel from "./ModifiersPanel";
+import ModifiersPanel from "./ModifiersPanel"; // Importação padrão
 import Modal from "@/components/ui/Modal";
 
 export default function MarmitasManager() {
-   // Toast de erro
+  // --- Estados Gerais ---
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const toastTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  const [marmitas, setMarmitas] = useState<Marmita[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Estado para controlar o formulário principal da Marmita
+  const [editing, setEditing] = useState<Marmita | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  
+  // Estado auxiliar para mostrar o painel logo após criar uma marmita
+  const [showModifiersModal, setShowModifiersModal] = useState<null | string>(null); 
+
+  // --- Helpers ---
+
   function showErrorToast(msg: string) {
     setErrorToast(msg);
     if (toastTimeout.current) clearTimeout(toastTimeout.current);
     toastTimeout.current = setTimeout(() => setErrorToast(null), 4000);
   }
-  const [marmitas, setMarmitas] = useState<Marmita[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<Marmita | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [showModifiersModal, setShowModifiersModal] = useState<null | string>(null); // marmitaId
-  const [modifiersPanelState, setModifiersPanelState] = useState<{ groupId?: string; itemId?: string; mode?: 'group' | 'item'; } | null>(null);
 
-  function getAuthHeaders() {
+  function getAuthHeaders(): Record<string, string> {
     const token = localStorage.getItem("authToken");
-    if (!token) return { "Content-Type": "application/json" };
-    return {
+    const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    return headers;
   }
+
+  // --- Fetch Data ---
 
   async function fetchMarmitas() {
     setLoading(true);
@@ -55,41 +66,41 @@ export default function MarmitasManager() {
     fetchMarmitas();
   }, []);
 
+  // --- Handlers Marmita ---
+
   function handleCreate() {
     setEditing(null);
     setShowForm(true);
+    setShowModifiersModal(null);
   }
 
   function handleEdit(marmita: Marmita) {
     setEditing(marmita);
     setShowForm(true);
+    setShowModifiersModal(null);
   }
 
-  // --- NOVA FUNÇÃO ADICIONADA AQUI ---
   async function handleToggleActive(marmita: Marmita, active: boolean) {
-    // 1. Atualização Otimista (Muda na tela antes do banco responder)
+    // Atualização Otimista
     setMarmitas((prev) =>
       prev.map((m) => (m.id === marmita.id ? { ...m, active } : m))
     );
 
     try {
       const headers = getAuthHeaders();
-      // Assume que sua API aceita PATCH para atualizar apenas um campo. 
-      // Se sua API exigir PUT com todos os dados, me avise.
       await fetch(`/api/marmitas/${marmita.id}`, {
         method: "PATCH", 
         headers,
         body: JSON.stringify({ active }),
       });
-      // Não precisa fazer fetchMarmitas() aqui se a atualização otimista funcionou, economiza requisição.
     } catch (error) {
       showErrorToast("Erro ao atualizar o status da marmita.");
+      // Reverte em caso de erro
       setMarmitas((prev) =>
         prev.map((m) => (m.id === marmita.id ? { ...m, active: !active } : m))
       );
     }
   }
-  // ------------------------------------
 
   async function handleDelete(marmita: Marmita) {
     if (!confirm(`Excluir marmita "${marmita.name}"?`)) return;
@@ -111,6 +122,7 @@ export default function MarmitasManager() {
     const headers = getAuthHeaders();
     try {
       if (editing) {
+        // Edição
         const res = await fetch(`/api/marmitas/${editing.id}`, {
           method: "PUT",
           headers,
@@ -119,13 +131,12 @@ export default function MarmitasManager() {
         if (!res.ok) {
           const err = await res.json();
           showErrorToast(err.error || err.message || "Erro ao editar marmita.");
-          setShowForm(false);
-          fetchMarmitas();
           return;
         }
         setShowForm(false);
         fetchMarmitas();
       } else {
+        // Criação
         const res = await fetch("/api/marmitas", {
           method: "POST",
           headers,
@@ -133,10 +144,11 @@ export default function MarmitasManager() {
         });
         if (res.ok) {
           const newMarmita = await res.json();
-          setShowForm(false);
-          fetchMarmitas();
+          // Não fecha o form, mas muda para modo edição para permitir adicionar modificadores
           setEditing(newMarmita);
           setShowModifiersModal(newMarmita.id);
+          fetchMarmitas();
+          // showForm continua true
         } else {
           const err = await res.json();
           showErrorToast(err.error || err.message || "Erro ao criar marmita.");
@@ -151,6 +163,8 @@ export default function MarmitasManager() {
     }
   }
 
+  // --- Render ---
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4">
@@ -164,8 +178,15 @@ export default function MarmitasManager() {
           <span className="text-lg">+</span> Nova Marmita
         </button>
       </div>
-      <Modal open={showForm} onClose={() => setShowForm(false)} title={editing ? "Editar Marmita" : "Nova Marmita"}>
+
+      {/* MODAL PRINCIPAL: Formulário da Marmita + Painel de Modificadores */}
+      <Modal 
+        open={showForm} 
+        onClose={() => setShowForm(false)} 
+        title={editing ? "Editar Marmita" : "Nova Marmita"}
+      >
         <div className="flex flex-col md:flex-row gap-8">
+          {/* Lado Esquerdo: Dados da Marmita */}
           <div className="flex-1">
             <MarmitaForm
               initialValues={editing || undefined}
@@ -174,48 +195,37 @@ export default function MarmitasManager() {
               isEdit={!!editing}
             />
           </div>
+
+          {/* Lado Direito: Modificadores (Só aparece se já existir a marmita) */}
           {(editing || showModifiersModal) && (
             <div className="flex-1 bg-white/60 dark:bg-white/10 rounded-lg p-4 shadow border border-slate-200 dark:border-slate-700">
               <h3 className="text-lg font-semibold mb-4 text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <span role="img" aria-label="modificadores">🛠️</span> Modificadores
               </h3>
+              
+              {/* LÓGICA A: O ModifiersPanel gerencia seus próprios formulários e modais internamente.
+                 Passamos props vazias apenas para satisfazer a interface TypeScript,
+                 pois não queremos controlar o estado aqui no pai.
+              */}
               <ModifiersPanel
                 marmitaId={editing ? editing.id : showModifiersModal!}
-                onEditGroup={groupId => setModifiersPanelState({ groupId, mode: 'group' })}
-                onAddGroup={() => setModifiersPanelState({ mode: 'group' })}
-                onEditItem={(groupId, itemId) => setModifiersPanelState({ groupId, itemId, mode: 'item' })}
-                onAddItem={groupId => setModifiersPanelState({ groupId, mode: 'item' })}
+                onAddGroup={() => {}}
+                onEditGroup={() => {}}
+                onAddItem={() => {}}
+                onEditItem={() => {}}
               />
             </div>
           )}
         </div>
       </Modal>
-      {/* Modal para editar/adicionar grupo/item */}
-      <Modal
-        open={!!modifiersPanelState}
-        onClose={() => setModifiersPanelState(null)}
-        title={modifiersPanelState?.mode === 'group' ? (modifiersPanelState?.groupId ? 'Editar Grupo de Modificador' : 'Novo Grupo de Modificador') : (modifiersPanelState?.itemId ? 'Editar Item de Modificador' : 'Novo Item de Modificador')}
-      >
-        {modifiersPanelState?.mode === 'group' && (
-          <ModifiersPanel.GroupForm
-            marmitaId={editing ? editing.id : showModifiersModal!}
-            groupId={modifiersPanelState.groupId}
-            onClose={() => setModifiersPanelState(null)}
-          />
-        )}
-        {modifiersPanelState?.mode === 'item' && modifiersPanelState.groupId && (
-          <ModifiersPanel.ItemForm
-            groupId={modifiersPanelState.groupId}
-            itemId={modifiersPanelState.itemId}
-            onClose={() => setModifiersPanelState(null)}
-          />
-        )}
-      </Modal>
+
+      {/* Lista de Marmitas */}
       <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 shadow">
         {loading ? (
-          <div className="flex items-center gap-2 text-blue-600 animate-pulse"><span className="h-4 w-4 rounded-full bg-blue-300 animate-bounce"></span> Carregando...</div>
+          <div className="flex items-center gap-2 text-blue-600 animate-pulse">
+            <span className="h-4 w-4 rounded-full bg-blue-300 animate-bounce"></span> Carregando...
+          </div>
         ) : (
-          /* CORREÇÃO AQUI: PASSEI A PROP onToggleActive */
           <MarmitasList 
             marmitas={marmitas} 
             onEdit={handleEdit} 
@@ -224,9 +234,10 @@ export default function MarmitasManager() {
           />
         )}
       </div>
-    {errorToast && (
-      <Toast message={errorToast} type="error" onClose={() => setErrorToast(null)} />
-    )}
+
+      {errorToast && (
+        <Toast message={errorToast} type="error" onClose={() => setErrorToast(null)} />
+      )}
     </div>
   );
 }

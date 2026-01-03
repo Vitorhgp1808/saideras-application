@@ -9,6 +9,7 @@ export interface Marmita {
   unitOfMeasure?: string;
   createdAt: string;
   updatedAt: string;
+  imageUrl?: string;
 }
 
 export interface MarmitaFormValues {

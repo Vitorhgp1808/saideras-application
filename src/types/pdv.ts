@@ -18,6 +18,8 @@ export type Product = {
   batch?: string;
   expiryDate?: string; // DateTime? in Prisma -> string | Date | undefined
   createdAt: string;
+  isComposite: boolean;
+  active: boolean;
   updatedAt: string;
   imageUrl?: string | null;
 };

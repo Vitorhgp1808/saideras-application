@@ -81,18 +81,6 @@ export async function POST(req: NextRequest) {
             isCourtesy: item.isCourtesy ?? false,
           },
         });
-        // Se for marmita e tiver modificadores, salva escolhas
-        if (item.modifiers && Array.isArray(item.modifiers)) {
-          for (const mod of item.modifiers) {
-            // mod: { modifierItemId }
-            await prisma.orderItemModifier.create({
-              data: {
-                orderItemId: orderItem.id,
-                modifierItemId: mod.modifierItemId,
-              },
-            });
-          }
-        }
       }
     }
 
@@ -103,16 +91,6 @@ export async function POST(req: NextRequest) {
         items: {
           include: {
             product: true,
-            orderItemModifiers: {
-              include: {
-                modifierItem: {
-                  include: {
-                    modifierGroup: true,
-                    product: true,
-                  },
-                },
-              },
-            },
           },
         },
         waiter: true,

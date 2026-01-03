@@ -24,7 +24,9 @@ export function MarmitaForm({ initialValues, onSubmit, onCancel, isEdit }: Marmi
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
-    const { name, value, type, checked } = e.target;
+    const target = e.target as HTMLInputElement;
+    const { name, value, type, checked } = target;
+
     setValues((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,

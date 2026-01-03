@@ -3,13 +3,14 @@
 import { useState, useRef } from 'react';
 import { Search, Beer, Utensils, Wine, Box, ShoppingBag } from 'lucide-react';
 import { Toast } from '@/components/ui/Toast';
+import { ProductCategory } from '@prisma/client';
 
 type SerializedProduct = {
   id: string;
   name: string;
   description: string | null;
   sellingPrice: number;
-  category: 'CHOPP' | 'FOOD' | 'DRINK' | 'OTHER';
+  category: ProductCategory;
   unitOfMeasure: string;
   stock: number;
   active: boolean;

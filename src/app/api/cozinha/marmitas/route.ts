@@ -44,9 +44,9 @@ export async function GET() {
   return NextResponse.json(result);
 }
 
-function groupModifiers(modifiers) {
+function groupModifiers(modifiers : any[]) {
   // Agrupa por grupo de modificador
-  const groups = {};
+  const groups: Record<string, string[]> = {};
   for (const mod of modifiers) {
     const groupName = mod.modifierItem.modifierGroup.name;
     if (!groups[groupName]) groups[groupName] = [];
